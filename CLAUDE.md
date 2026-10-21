@@ -127,7 +127,7 @@ These need Asa's decision; the first two block the art pass, the third blocks mi
 
 - [ ] Which cat sprite pack? It sets the palette and resolution for everything else.
 - [ ] Prop size: 16×16 or 32×32 pixels?
-- [ ] Camera view: straight top-down (simplest) or a front-facing room view (prettier, harder)?
+- [x] Camera view: straight top-down (simplest) or a front-facing room view (prettier, harder)? → **Front-facing room view** (decided Oct 21, 2026).
 - [ ] Does the cat have a name and personality, and should its preferences ever change?
 - [x] Hosting: GitHub Pages or itch.io? → **GitHub Pages** (decided Oct 21, 2026). Every push to `main` deploys automatically.
 
