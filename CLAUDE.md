@@ -46,9 +46,14 @@ Cleaning is a short, satisfying gate of 60–120 seconds. If playtesting shows i
 
 Decorating is the core of the game, so it gets built and playtested first (see Milestones).
 
-- **Grid:** each room is a tile grid, roughly 12×9 floor tiles plus a row of wall slots.
-- **Footprints:** items take 1×1, 2×1, or 2×2 tiles.
+- **Grid (front-facing view):** each room is 12 columns wide, with 3 rows of wall slots above 3 rows of floor (back to front). Items in front rows draw on top of items behind them.
+- **Footprints:** floor items take 1×1, 2×1, or 2×2 tiles. Wall items are always 1×1, since multi-tile wall art is out of v1.
 - **Layers:** floor (rugs, chairs, cauldron), wall (frames, shelves, moon charts), and surface (candles, potions, plants placed on top of furniture).
+- **Surface rules:**
+  - Some floor furniture has a top with one surface slot per tile of width (a 2×1 table has 2 slots). Rugs and the cauldron have no top, and wall items (including shelves) have no surface in v1.
+  - Surface items (candles, potions, plants) take one slot and can only sit on a surface.
+  - Moving furniture moves whatever sits on it. Removing furniture sends whatever sits on it back to the tray.
+  - Dropping an item where it doesn't fit snaps it back to where it came from; the drop highlight shows red while hovering there.
 - **Controls:** drag from an inventory tray to place; drag to move; drag back to the tray to remove. Mouse and touch both work. No rotation in v1.
 - **Unlocks:** coins buy items in a simple shop. Items with tags the cat liked are revealed first, so the cat steers your collection.
 - **Catalog size:** 25–30 decor items for v1.
