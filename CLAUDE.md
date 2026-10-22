@@ -30,6 +30,7 @@ Decided Oct 21, 2026, after the milestone 2 playtest: a scored cat review made d
 - **Behavior (scripted, no real AI or pathfinding in v1):**
   - Idle: wanders, sits, grooms, or naps, drifting toward cozy spots (e.g. a rug or near the cauldron) when there are some.
   - When an item is placed or moved, the cat finishes what it's doing (including a nap), then strolls over and reacts. Several new items are visited one at a time, at the cat's own pace.
+  - When reacting to something on furniture (e.g. a candle on a table), the cat stands on that item's side of the furniture, or the other side if there's no room.
   - Player actions never interrupt the cat's flow (except the cases below). While the player drags something, an idle cat that's sitting still glances toward it; a walking, napping, or reacting cat carries on.
   - Tapping the cat pets it. If it's idle, it purrs, a heart floats up, and it rolls over. If it's on the move, it slows down happily while petted and keeps going. If it's reacting, a heart floats up and it carries on. Petting never cuts the cat's action short. A drag that starts on the cat still picks up the item underneath.
   - If the item the cat is reacting to is moved or removed (including by moving the furniture or shelf it sits on), it ends that reaction and moves on to the next thing. A moved item is visited again later, after anything else that's waiting.

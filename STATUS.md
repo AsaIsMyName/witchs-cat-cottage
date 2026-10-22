@@ -1,5 +1,25 @@
 # Status
 
+## Oct 22, 2026 — The cat stands on the item's side of the table (awaiting playtest)
+
+**Done**
+- When the cat reacts to a candle, potion, or plant on floor furniture, it stands on the side of the furniture that item is on: left slot of the table → left side, right slot → right side. If that side has no room (room edge), it uses the other side. A 1-slot host like the stool keeps the old behavior (left if there's room, else right). Wall shelves and non-surface items are unchanged.
+- New pure helper `slotSide` in `src/logic/cat.ts` (tested); `approach()` in `src/scenes/cat-actor.ts` uses it, and now also checks the right room edge.
+- Asa's call: the cat can keep loafing on a table that has items on it. Loafing is unchanged.
+- Moving a candle to the other slot of the same table now changes the stand point, so the mid-walk "item moved" check sees it as moved (intended).
+- CLAUDE.md "The cat": added the stand-on-the-item's-side note.
+- 107 unit tests pass. Save format unchanged.
+
+**Not verified**
+- Not run in a real browser. Asa, please re-test locally:
+  - Put a candle in the table's left slot, then the right slot: does the cat walk to the matching side?
+  - Push the table against the left or right wall and use the slot on that side: does the cat go to the other side instead?
+  - Candle on the stool: same as before.
+  - Move a candle to the other slot while the cat walks to it: it should give up and come back to the new side later.
+
+**Next**
+- Asa playtests on a phone.
+
 ## Oct 21, 2026 — Gentler petting, moved items end reactions, offended blink (awaiting playtest)
 
 Asa's local playtest: petting cut the cat's actions short, moving an item mid-reaction made the cat restart in place, and the grumpy wake-up was a bit aggressive.

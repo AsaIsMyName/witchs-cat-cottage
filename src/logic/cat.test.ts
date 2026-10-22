@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedItems, displaced, movedOrRemoved, pickIdle, toBack, reactionFor, type CatBehavior, type TaggedCatalog } from "./cat";
+import { changedItems, displaced, movedOrRemoved, pickIdle, slotSide, toBack, reactionFor, type CatBehavior, type TaggedCatalog } from "./cat";
 import { emptyRoom, moveItem, placeFromTray, removeToTray, type RoomShape, type RoomState, type Target } from "./grid";
 
 const room: RoomShape = { columns: 12, wallRows: 3, floorRows: 3 };
@@ -185,5 +185,24 @@ describe("toBack", () => {
 
   it("drops an item that is gone", () => {
     expect(toBack(["p1", "p2"], "p1", false)).toEqual(["p2"]);
+  });
+});
+
+describe("slotSide", () => {
+  it("puts slot 0 of a 2-wide host on the left and slot 1 on the right", () => {
+    expect(slotSide(0, 2)).toBe("left");
+    expect(slotSide(1, 2)).toBe("right");
+  });
+
+  it("has no preference for a 1-slot host", () => {
+    expect(slotSide(0, 1)).toBeUndefined();
+  });
+
+  it("uses the half a slot is in on wider hosts", () => {
+    expect(slotSide(0, 3)).toBe("left");
+    expect(slotSide(1, 3)).toBeUndefined();
+    expect(slotSide(2, 3)).toBe("right");
+    expect(slotSide(1, 4)).toBe("left");
+    expect(slotSide(2, 4)).toBe("right");
   });
 });

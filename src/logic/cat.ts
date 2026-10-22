@@ -105,6 +105,17 @@ export function toBack(queue: string[], uid: string, present: boolean): string[]
   return present ? [...rest, uid] : rest;
 }
 
+/**
+ * Which side of its furniture a surface item in `slot` sits on, so the cat can stand there.
+ * Undefined for a middle slot (including a 1-slot host like the stool): no preference.
+ */
+export function slotSide(slot: number, hostWidth: number): "left" | "right" | undefined {
+  const middle = hostWidth / 2;
+  if (slot + 0.5 < middle) return "left";
+  if (slot + 0.5 > middle) return "right";
+  return undefined;
+}
+
 export function spotOf(state: RoomState, p: Placement): Spot {
   if (p.layer !== "surface") return p.layer;
   const host = state.placements.find((h) => h.uid === p.hostUid);

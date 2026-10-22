@@ -11,6 +11,7 @@ import {
   movedOrRemoved,
   pickIdle,
   reactionFor,
+  slotSide,
   toBack,
   type IdleAction,
   type Reaction,
@@ -324,10 +325,16 @@ export class CatActor {
     const host = placement?.layer === "surface" ? this.getViews().get(placement.hostUid) : undefined;
     const anchor = host ?? view;
     if (anchor.def.layer === "wall") return { point: { x: view.centerX, y: FLOOR_Y + TILE - 4 }, perch: false };
-    // Stand beside the item (or its furniture), on whichever side has room.
+    // Stand beside the item (or its furniture): on the side a surface item sits on, else the left,
+    // falling back to the other side when there's no room.
     const width = anchor.def.width * TILE;
     const left = anchor.x - BODY_W / 2 - 2;
-    const x = left > ROOM_X + BODY_W ? left : anchor.x + width + BODY_W / 2 + 2;
+    const right = anchor.x + width + BODY_W / 2 + 2;
+    const side = host && placement?.layer === "surface" ? slotSide(placement.slot, host.def.width) : undefined;
+    const x =
+      side === "right"
+        ? right < ROOM_X + BEDROOM.columns * TILE - BODY_W ? right : left
+        : left > ROOM_X + BODY_W ? left : right;
     return { point: { x, y: footprintBottom(anchor) - 4 }, perch: false };
   }
 
