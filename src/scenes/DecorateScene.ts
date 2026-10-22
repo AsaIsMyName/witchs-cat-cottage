@@ -10,7 +10,6 @@ import {
   planDrop,
   removeToTray,
   surfaceItemsOn,
-  targetOf,
   type GridLayer,
   type GridPlacement,
   type RoomState,
@@ -393,10 +392,9 @@ export class DecorateScene extends Phaser.Scene {
     g.fillStyle(color, 0.3).fillRect(box.x, box.y, box.w, box.h);
     g.lineStyle(2, color, 0.9).strokeRect(box.x, box.y, box.w, box.h);
 
-    // For a swap, also outline where the other item will go: the dragged item's old spot.
-    const current = this.state.placements.find((p) => p.uid === movingUid);
-    const oldBox = plan.kind === "swap" && current ? this.dropBox(def, targetOf(current)) : null;
-    if (oldBox) g.lineStyle(2, COLOR_SWAP, 0.9).strokeRect(oldBox.x, oldBox.y, oldBox.w, oldBox.h);
+    // For a swap, also outline where the other item will go.
+    const otherBox = plan.kind === "swap" ? this.dropBox(CATALOG[plan.other.itemId], plan.otherTarget) : null;
+    if (otherBox) g.lineStyle(2, COLOR_SWAP, 0.9).strokeRect(otherBox.x, otherBox.y, otherBox.w, otherBox.h);
   }
 
   /** Screen area an item of `def` would cover at `target`. */

@@ -97,17 +97,16 @@ export function canPlace(
 }
 
 /**
- * What a drop would do, and where the item ends up:
+ * What a drop would do, and where the items end up:
  * - "place": the spot is free.
- * - "swap": the dropped item came from the room and lands on one other item that can take its old
- *   spot (a surface item, or a grid item with the same footprint). On the grid, the swap snaps to
- *   the other item's exact spot. Anything sitting on either item moves with it.
+ * - "swap": the dropped item came from the room and lands on exactly one other item, which moves to
+ *   `otherTarget` (see `planSwap`). Anything sitting on either item moves with it.
  * - "replace": a surface item lands on an occupied slot it can't swap with (e.g. from the tray);
  *   the item already there goes back to the tray.
  */
 export type DropPlan =
   | { kind: "place"; target: Target }
-  | { kind: "swap"; target: Target; other: Placement }
+  | { kind: "swap"; target: Target; other: Placement; otherTarget: Target }
   | { kind: "replace"; target: Target; other: Placement }
   | { kind: "blocked" };
 
@@ -125,10 +124,8 @@ export function planDrop(
   if (canPlace(room, catalog, state, itemId, target, movingUid)) return { kind: "place", target };
   const other = occupantAt(catalog, state, itemId, target, movingUid);
   if (!other) return { kind: "blocked" };
-  if (movingUid !== undefined) {
-    const swapTarget = targetOf(other);
-    if (swapWith(room, catalog, state, movingUid, swapTarget, other)) return { kind: "swap", target: swapTarget, other };
-  }
+  const swap = movingUid !== undefined && planSwap(room, catalog, state, movingUid, target, other);
+  if (swap) return { kind: "swap", ...swap, other };
   if (other.layer === "surface" && canPlace(room, catalog, removeToTray(state, other.uid), itemId, target, movingUid)) {
     return { kind: "replace", target, other };
   }
@@ -181,7 +178,7 @@ export function moveItem(
   if (!current) return null;
   const plan = planDrop(room, catalog, state, current.itemId, target, uid);
   if (plan.kind === "blocked") return null;
-  if (plan.kind === "swap") return swapWith(room, catalog, state, uid, plan.target, plan.other);
+  if (plan.kind === "swap") return swapState(room, catalog, state, uid, plan.target, plan.other, plan.otherTarget);
   const base = plan.kind === "replace" ? removeToTray(state, plan.other.uid) : state;
   const moved = toPlacement(uid, current.itemId, current.layer, plan.target);
   return { ...base, placements: base.placements.map((p) => (p.uid === uid ? moved : p)) };
@@ -232,7 +229,7 @@ export function targetOf(p: Placement): Target {
 
 /**
  * The single item a drop of `itemId` at `target` would land on, if it's a swap or replace candidate:
- * the surface item in that slot, or the one same-layer grid item overlapped, if it has the same footprint.
+ * the surface item in that slot, or the one same-layer grid item overlapped.
  */
 function occupantAt(
   catalog: Catalog,
@@ -251,34 +248,77 @@ function occupantAt(
     const other = catalog[p.itemId];
     return other !== undefined && overlaps(target, item, p, other);
   });
-  if (overlapped.length !== 1) return undefined;
-  const other = catalog[overlapped[0].itemId];
-  return other.width === item.width && other.height === item.height ? overlapped[0] : undefined;
+  return overlapped.length === 1 ? overlapped[0] : undefined;
 }
 
-/** Moves `uid` to `target` and `occupant` to the old spot of `uid`, or null if either doesn't fit. */
-function swapWith(
+/**
+ * Where a swap puts both items, or null if no swap fits:
+ * - Surface items, and grid items with the same footprint: the two trade exact spots (snapping a
+ *   half-overlapping drop onto the other item's spot).
+ * - Grid items with different footprints: the dragged item lands where it was dropped, and the
+ *   other item takes the nearest spot that covers part of the dragged item's old footprint.
+ */
+function planSwap(
   room: RoomShape,
   catalog: Catalog,
   state: RoomState,
   uid: string,
   target: Target,
-  occupant: Placement,
+  other: Placement,
+): { target: Target; otherTarget: Target } | null {
+  const current = state.placements.find((p) => p.uid === uid);
+  if (!current) return null;
+  const item = catalog[current.itemId];
+  const otherItem = catalog[other.itemId];
+  const tryTargets = (dropAt: Target, candidates: Target[]) => {
+    const otherTarget = candidates.find((o) => swapState(room, catalog, state, uid, dropAt, other, o));
+    return otherTarget ? { target: dropAt, otherTarget } : null;
+  };
+
+  const sameFootprint = item.width === otherItem.width && item.height === otherItem.height;
+  if (current.layer === "surface" || other.layer === "surface" || sameFootprint) {
+    return tryTargets(targetOf(other), [targetOf(current)]);
+  }
+  return tryTargets(target, coveringSpots(current, item, otherItem));
+}
+
+/**
+ * Every spot for an item of `otherShape` that overlaps the footprint `oldShape` had at `old`,
+ * nearest to `old` first. Spots outside the room are filtered out later by `canPlace`.
+ */
+function coveringSpots(old: GridSpot, oldShape: ItemShape, otherShape: ItemShape): Target[] {
+  const spots: { col: number; row: number; distance: number }[] = [];
+  for (let row = old.row - otherShape.height + 1; row < old.row + oldShape.height; row++) {
+    for (let col = old.col - otherShape.width + 1; col < old.col + oldShape.width; col++) {
+      spots.push({ col, row, distance: Math.abs(col - old.col) + Math.abs(row - old.row) });
+    }
+  }
+  return spots.sort((a, b) => a.distance - b.distance).map(({ col, row }) => ({ kind: "grid", col, row }));
+}
+
+/** Moves `uid` to `target` and `other` to `otherTarget`, or null if either doesn't fit. */
+function swapState(
+  room: RoomShape,
+  catalog: Catalog,
+  state: RoomState,
+  uid: string,
+  target: Target,
+  other: Placement,
+  otherTarget: Target,
 ): RoomState | null {
   const current = state.placements.find((p) => p.uid === uid);
   if (!current) return null;
-  const oldSpot = targetOf(current);
   const next: RoomState = {
     ...state,
     placements: state.placements.map((p) => {
       if (p.uid === uid) return toPlacement(uid, current.itemId, current.layer, target);
-      if (p.uid === occupant.uid) return toPlacement(occupant.uid, occupant.itemId, occupant.layer, oldSpot);
+      if (p.uid === other.uid) return toPlacement(other.uid, other.itemId, other.layer, otherTarget);
       return p;
     }),
   };
   const fits =
     canPlace(room, catalog, next, current.itemId, target, uid) &&
-    canPlace(room, catalog, next, occupant.itemId, oldSpot, occupant.uid);
+    canPlace(room, catalog, next, other.itemId, otherTarget, other.uid);
   return fits ? next : null;
 }
 

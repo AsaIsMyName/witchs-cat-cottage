@@ -23,6 +23,8 @@ const catalog: Catalog = {
   table: { id: "table", layer: "floor", width: 2, height: 1, hasSurface: true },
   rug: { id: "rug", layer: "rug", width: 2, height: 1 },
   bed: { id: "bed", layer: "floor", width: 2, height: 2 },
+  stool: { id: "stool", layer: "floor", width: 1, height: 1, hasSurface: true },
+  cauldron: { id: "cauldron", layer: "floor", width: 1, height: 1 },
   candle: { id: "candle", layer: "surface", width: 1, height: 1 },
 };
 
@@ -226,10 +228,8 @@ describe("swapping wall and floor items", () => {
     expect(dropKind(room, catalog, s, "rug", { kind: "grid", col: 6, row: 1 }, "p1")).toBe("swap");
   });
 
-  it("blocks different footprints, drops covering two items, and drops from the tray", () => {
-    let s = place(start(), "bed", { kind: "grid", col: 0, row: 0 });
-    s = place(s, "table", { kind: "grid", col: 4, row: 0 });
-    expect(dropKind(room, catalog, s, "bed", { kind: "grid", col: 4, row: 0 }, "p1")).toBe("blocked");
+  it("blocks drops covering two items and drops from the tray", () => {
+    const s = place(start(), "table", { kind: "grid", col: 4, row: 0 });
     expect(dropKind(room, catalog, s, "table", { kind: "grid", col: 4, row: 0 })).toBe("blocked");
 
     let t = emptyRoom({ table: 3 });
@@ -237,6 +237,72 @@ describe("swapping wall and floor items", () => {
     t = place(t, "table", { kind: "grid", col: 2, row: 0 });
     t = place(t, "table", { kind: "grid", col: 6, row: 0 });
     expect(dropKind(room, catalog, t, "table", { kind: "grid", col: 1, row: 0 }, "p3")).toBe("blocked");
+  });
+});
+
+describe("swapping different footprints", () => {
+  const setup = () => {
+    let s = emptyRoom({ table: 1, stool: 1, cauldron: 2, candle: 1 });
+    s = place(s, "table", { kind: "grid", col: 0, row: 0 });
+    s = place(s, "candle", { kind: "surface", hostUid: "p1", slot: 1 });
+    return s;
+  };
+
+  it("drops the stool on the table and fits the table where the stool was", () => {
+    const s = place(setup(), "stool", { kind: "grid", col: 5, row: 1 });
+    const plan = planDrop(room, catalog, s, "stool", { kind: "grid", col: 1, row: 0 }, "p3");
+    expect(plan).toMatchObject({
+      kind: "swap",
+      target: { kind: "grid", col: 1, row: 0 },
+      otherTarget: { kind: "grid", col: 5, row: 1 },
+    });
+    const after = moveItem(room, catalog, s, "p3", { kind: "grid", col: 1, row: 0 })!;
+    expect(after.placements).toMatchObject([
+      { uid: "p1", itemId: "table", col: 5, row: 1 },
+      { uid: "p2", itemId: "candle", hostUid: "p1", slot: 1 },
+      { uid: "p3", itemId: "stool", col: 1, row: 0 },
+    ]);
+  });
+
+  it("drops the table on the stool and moves the stool into the table's old spot", () => {
+    const s = place(setup(), "stool", { kind: "grid", col: 5, row: 1 });
+    const after = moveItem(room, catalog, s, "p1", { kind: "grid", col: 5, row: 1 })!;
+    expect(after.placements).toMatchObject([
+      { uid: "p1", itemId: "table", col: 5, row: 1 },
+      { uid: "p2", itemId: "candle", hostUid: "p1" },
+      { uid: "p3", itemId: "stool", col: 0, row: 0 },
+    ]);
+  });
+
+  it("shifts the table left when the stool was against the right wall", () => {
+    const s = place(setup(), "stool", { kind: "grid", col: 11, row: 2 });
+    const plan = planDrop(room, catalog, s, "stool", { kind: "grid", col: 0, row: 0 }, "p3");
+    expect(plan).toMatchObject({ kind: "swap", otherTarget: { kind: "grid", col: 10, row: 2 } });
+  });
+
+  it("shifts the table left when something blocks its right side", () => {
+    let s = place(setup(), "stool", { kind: "grid", col: 5, row: 1 });
+    s = place(s, "cauldron", { kind: "grid", col: 6, row: 1 });
+    const plan = planDrop(room, catalog, s, "stool", { kind: "grid", col: 0, row: 0 }, "p3");
+    expect(plan).toMatchObject({ kind: "swap", otherTarget: { kind: "grid", col: 4, row: 1 } });
+  });
+
+  it("blocks the swap when the table can't fit on either side", () => {
+    let s = place(setup(), "stool", { kind: "grid", col: 5, row: 1 });
+    s = place(s, "cauldron", { kind: "grid", col: 4, row: 1 });
+    s = place(s, "cauldron", { kind: "grid", col: 6, row: 1 });
+    expect(dropKind(room, catalog, s, "stool", { kind: "grid", col: 0, row: 0 }, "p3")).toBe("blocked");
+  });
+
+  it("swaps a 2×2 item with a 2×1 item", () => {
+    let s = emptyRoom({ bed: 1, table: 1 });
+    s = place(s, "bed", { kind: "grid", col: 0, row: 0 });
+    s = place(s, "table", { kind: "grid", col: 6, row: 2 });
+    const after = moveItem(room, catalog, s, "p1", { kind: "grid", col: 6, row: 1 })!;
+    expect(after.placements).toMatchObject([
+      { uid: "p1", col: 6, row: 1 },
+      { uid: "p2", col: 0, row: 0 },
+    ]);
   });
 });
 
@@ -279,8 +345,9 @@ describe("moveItem", () => {
 
   it("refuses a blocked spot", () => {
     let s = place(start(), "table", { kind: "grid", col: 0, row: 0 });
-    s = place(s, "bed", { kind: "grid", col: 4, row: 0 });
-    expect(moveItem(room, catalog, s, "p2", { kind: "grid", col: 1, row: 0 })).toBeNull();
+    s = place(s, "table", { kind: "grid", col: 2, row: 0 });
+    s = place(s, "bed", { kind: "grid", col: 6, row: 0 });
+    expect(moveItem(room, catalog, s, "p3", { kind: "grid", col: 1, row: 0 })).toBeNull();
   });
 
   it("carries surface items along with their furniture", () => {

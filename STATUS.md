@@ -1,6 +1,21 @@
 # Status
 
-## Oct 21, 2026 — Same-footprint swaps (awaiting playtest)
+## Oct 21, 2026 — Swaps between different sizes (awaiting playtest)
+
+Same-footprint swap playtest: passed.
+
+**Done**
+- Items of different sizes swap (e.g. stool and table): the dragged item lands where it's dropped, and the other item takes the nearest spot covering part of the dragged item's old spot, shifting left/right/up as needed. Blocked if nothing fits. Highlight outlines both destinations in blue.
+- 72 unit tests pass. Save format unchanged.
+
+**Watch in playtest**
+- Any drop that overlaps exactly one item now swaps, so a table dropped one tile too close to the stool swaps with it instead of showing red.
+
+**Next**
+- Asa playtests stool/table swaps on a phone.
+- Then milestone 2: cat reactor.
+
+## Oct 21, 2026 — Same-footprint swaps
 
 **Done**
 - Wall, floor, and rug items swap places with a same-footprint item on the same layer (e.g. an empty shelf and a shelf holding a candle; two tables). Items on top ride along. The swap snaps to exact spots, and the highlight outlines both spots in blue.
