@@ -31,6 +31,13 @@ The cat gives decorating a goal. Without it, decorating is an empty sandbox; wit
 - **Score:** cat happiness from 0 to 100, shown as hearts.
 - **Discoverability:** dislikes must be learnable, not punishing. The cat's reactions and short hint text teach its preferences over a few rooms.
 - **v1 behavior is scripted:** the cat walks a fixed path visiting items in order. No real pathfinding or AI in v1.
+- **v1 rules (decided Oct 21, 2026; all values live in `src/data/cat.ts` and `src/data/items.ts`):**
+  - Likes soft, warm, shiny. Dislikes fragile items "up high", which means on a shelf only (tables and stools are fine).
+  - Each item's reaction: dislike if a dislike rule matches; otherwise like if it has a liked tag; otherwise a neutral sniff.
+  - Score: +15 per liked item, −20 per disliked item, clamped to 0–100, shown as 5 hearts in half-heart steps.
+  - Visit order: left to right by item center; at the same spot, rugs, then floor, then low surfaces, then wall, then shelf items.
+  - Knocked-over items fall in the animation, then return to the tray (with anything on them).
+  - The cat is unnamed ("the cat") and its preferences are fixed in v1.
 
 ## Cleaning phase
 
@@ -143,7 +150,7 @@ These need Asa's decision; the first two block the art pass, the third blocks mi
 - [ ] Which cat sprite pack? It sets the palette and resolution for everything else.
 - [ ] Prop size: 16×16 or 32×32 pixels?
 - [x] Camera view: straight top-down (simplest) or a front-facing room view (prettier, harder)? → **Front-facing room view** (decided Oct 21, 2026).
-- [ ] Does the cat have a name and personality, and should its preferences ever change?
+- [ ] Does the cat have a name and personality, and should its preferences ever change? → **Partly decided (Oct 21, 2026):** unnamed and fixed preferences in v1; revisit after playtesting.
 - [x] Hosting: GitHub Pages or itch.io? → **GitHub Pages** (decided Oct 21, 2026). Every push to `main` deploys automatically.
 
 ## Project commands

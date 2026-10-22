@@ -17,6 +17,11 @@ describe("item catalog", () => {
     if (item.hasSurface) expect(["floor", "wall"]).toContain(item.layer);
   });
 
+  it.each(ITEMS)("$id has 1–3 tags", (item) => {
+    expect(item.tags.length).toBeGreaterThanOrEqual(1);
+    expect(item.tags.length).toBeLessThanOrEqual(3);
+  });
+
   it("starts the tray with known items only", () => {
     for (const id of Object.keys(STARTING_INVENTORY)) expect(CATALOG[id]).toBeDefined();
   });
