@@ -1,17 +1,19 @@
 # Status
 
-## Oct 21, 2026 — Swap places in the room (awaiting playtest)
-
-Surface replacing playtest: passed. Asa asked that two room items swap places instead.
+## Oct 21, 2026 — Same-footprint swaps (awaiting playtest)
 
 **Done**
-- Moving a candle or potion onto another one in the room swaps their places (blue highlight). From the tray it still replaces and sends the old item to the tray (amber).
-- 61 unit tests pass. Save format unchanged.
+- Wall, floor, and rug items swap places with a same-footprint item on the same layer (e.g. an empty shelf and a shelf holding a candle; two tables). Items on top ride along. The swap snaps to exact spots, and the highlight outlines both spots in blue.
+- Different footprints, drops covering two items, and tray drops onto occupied tiles stay blocked.
+- 66 unit tests pass. Save format unchanged.
 
 **Next**
-- Asa playtests swapping on a phone.
-- Open question: should wall and floor items swap too?
+- Asa playtests swaps on a phone.
 - Then milestone 2: cat reactor.
+
+## Oct 21, 2026 — Swap places in the room
+
+- Moving a candle or potion onto another one in the room swaps their places (blue highlight). From the tray it still replaces and sends the old item to the tray (amber). Playtest: passed.
 
 ## Oct 21, 2026 — Surface swapping
 

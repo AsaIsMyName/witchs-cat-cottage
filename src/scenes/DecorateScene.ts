@@ -3,13 +3,14 @@ import { CATALOG, ITEMS, STARTING_INVENTORY, type ItemDef } from "../data/items"
 import { BEDROOM, ROOMS } from "../data/rooms";
 import {
   clearRoom,
-  dropKind,
   emptyRoom,
   isValidState,
   moveItem,
   placeFromTray,
+  planDrop,
   removeToTray,
   surfaceItemsOn,
+  targetOf,
   type GridLayer,
   type GridPlacement,
   type RoomState,
@@ -384,22 +385,31 @@ export class DecorateScene extends Phaser.Scene {
     if (!target) return;
 
     const def = drag.view.def;
-    const ignoreUid = drag.source.kind === "placed" ? drag.source.uid : undefined;
-    const kind = dropKind(BEDROOM, CATALOG, this.state, def.id, target, ignoreUid);
-    let box: Box;
-    if (target.kind === "surface") {
-      const host = this.placedViews.get(target.hostUid);
-      if (!host) return;
-      const top = host.y + visualBox(host.def).y;
-      box = { x: host.x + target.slot * TILE, y: top - SURFACE_ITEM_H - 2, w: TILE, h: SURFACE_ITEM_H + 2 };
-    } else {
-      if (def.layer === "surface") return;
-      const { x, y } = gridToWorld({ layer: def.layer, col: target.col, row: target.row });
-      box = { x, y, w: def.width * TILE, h: def.height * TILE };
-    }
-    const color = { place: COLOR_OK, swap: COLOR_SWAP, replace: COLOR_REPLACE, blocked: COLOR_BLOCKED }[kind];
+    const movingUid = drag.source.kind === "placed" ? drag.source.uid : undefined;
+    const plan = planDrop(BEDROOM, CATALOG, this.state, def.id, target, movingUid);
+    const color = { place: COLOR_OK, swap: COLOR_SWAP, replace: COLOR_REPLACE, blocked: COLOR_BLOCKED }[plan.kind];
+    const box = this.dropBox(def, plan.kind === "blocked" ? target : plan.target);
+    if (!box) return;
     g.fillStyle(color, 0.3).fillRect(box.x, box.y, box.w, box.h);
     g.lineStyle(2, color, 0.9).strokeRect(box.x, box.y, box.w, box.h);
+
+    // For a swap, also outline where the other item will go: the dragged item's old spot.
+    const current = this.state.placements.find((p) => p.uid === movingUid);
+    const oldBox = plan.kind === "swap" && current ? this.dropBox(def, targetOf(current)) : null;
+    if (oldBox) g.lineStyle(2, COLOR_SWAP, 0.9).strokeRect(oldBox.x, oldBox.y, oldBox.w, oldBox.h);
+  }
+
+  /** Screen area an item of `def` would cover at `target`. */
+  private dropBox(def: ItemDef, target: Target): Box | null {
+    if (target.kind === "surface") {
+      const host = this.placedViews.get(target.hostUid);
+      if (!host) return null;
+      const top = host.y + visualBox(host.def).y;
+      return { x: host.x + target.slot * TILE, y: top - SURFACE_ITEM_H - 2, w: TILE, h: SURFACE_ITEM_H + 2 };
+    }
+    if (def.layer === "surface") return null;
+    const { x, y } = gridToWorld({ layer: def.layer, col: target.col, row: target.row });
+    return { x, y, w: def.width * TILE, h: def.height * TILE };
   }
 
   private loadRoom(): RoomState {

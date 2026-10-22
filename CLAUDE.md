@@ -54,6 +54,7 @@ Decorating is the core of the game, so it gets built and playtested first (see M
   - Some furniture has a top with one surface slot per tile of width (a 2×1 table has 2 slots). Shelves are 1×1 wall items with 1 slot. Rugs, the cauldron, and other wall items have no top.
   - Surface items (candles, potions, plants) take one slot and can only sit on a surface.
   - Moving furniture moves whatever sits on it. Removing furniture sends whatever sits on it back to the tray.
+  - Moving a wall, floor, or rug item onto exactly one other item on the same layer with the same footprint swaps their places, snapping to the other item's exact spot (blue highlight on both spots). Anything sitting on either item moves with it. Different footprints, drops covering two items, and tray drops onto occupied tiles stay blocked.
   - Dropping a surface item onto an occupied slot:
     - From another slot in the room: the two items swap places if each fits in the other's spot (blue highlight).
     - From the tray, or if a swap doesn't fit: the new item replaces what's there, and the replaced item goes back to the tray (amber highlight).

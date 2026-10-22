@@ -7,6 +7,7 @@ import {
   isValidState,
   moveItem,
   placeFromTray,
+  planDrop,
   removeToTray,
   surfaceItemsOn,
   type Catalog,
@@ -179,6 +180,66 @@ describe("replacing surface items", () => {
   });
 });
 
+describe("swapping wall and floor items", () => {
+  it("swaps 1×1 wall items, and a shelf's item rides along", () => {
+    let s = place(start(), "frame", { kind: "grid", col: 0, row: 0 });
+    s = place(s, "shelf", { kind: "grid", col: 3, row: 1 });
+    s = place(s, "candle", { kind: "surface", hostUid: "p2", slot: 0 });
+    expect(dropKind(room, catalog, s, "shelf", { kind: "grid", col: 0, row: 0 }, "p2")).toBe("swap");
+    s = moveItem(room, catalog, s, "p2", { kind: "grid", col: 0, row: 0 })!;
+    expect(s.placements).toEqual([
+      { uid: "p1", itemId: "frame", layer: "wall", col: 3, row: 1 },
+      { uid: "p2", itemId: "shelf", layer: "wall", col: 0, row: 0 },
+      { uid: "p3", itemId: "candle", layer: "surface", hostUid: "p2", slot: 0 },
+    ]);
+  });
+
+  it("swaps an empty shelf with a shelf holding an item", () => {
+    let s = emptyRoom({ shelf: 2, candle: 1 });
+    s = place(s, "shelf", { kind: "grid", col: 0, row: 0 });
+    s = place(s, "shelf", { kind: "grid", col: 5, row: 2 });
+    s = place(s, "candle", { kind: "surface", hostUid: "p1", slot: 0 });
+    s = moveItem(room, catalog, s, "p2", { kind: "grid", col: 0, row: 0 })!;
+    expect(s.placements.slice(0, 2).map((p) => p.layer !== "surface" && [p.uid, p.col, p.row])).toEqual([
+      ["p1", 5, 2],
+      ["p2", 0, 0],
+    ]);
+    expect(surfaceItemsOn(s, "p1")).toHaveLength(1);
+  });
+
+  it("snaps a half-overlapping drop onto the other item's exact spot", () => {
+    let s = place(start(), "table", { kind: "grid", col: 0, row: 0 });
+    s = place(s, "table", { kind: "grid", col: 4, row: 2 });
+    const plan = planDrop(room, catalog, s, "table", { kind: "grid", col: 5, row: 2 }, "p1");
+    expect(plan).toMatchObject({ kind: "swap", target: { kind: "grid", col: 4, row: 2 } });
+    s = moveItem(room, catalog, s, "p1", { kind: "grid", col: 5, row: 2 })!;
+    expect(s.placements).toMatchObject([
+      { uid: "p1", col: 4, row: 2 },
+      { uid: "p2", col: 0, row: 0 },
+    ]);
+  });
+
+  it("swaps rugs with rugs", () => {
+    let s = emptyRoom({ rug: 2 });
+    s = place(s, "rug", { kind: "grid", col: 0, row: 0 });
+    s = place(s, "rug", { kind: "grid", col: 6, row: 1 });
+    expect(dropKind(room, catalog, s, "rug", { kind: "grid", col: 6, row: 1 }, "p1")).toBe("swap");
+  });
+
+  it("blocks different footprints, drops covering two items, and drops from the tray", () => {
+    let s = place(start(), "bed", { kind: "grid", col: 0, row: 0 });
+    s = place(s, "table", { kind: "grid", col: 4, row: 0 });
+    expect(dropKind(room, catalog, s, "bed", { kind: "grid", col: 4, row: 0 }, "p1")).toBe("blocked");
+    expect(dropKind(room, catalog, s, "table", { kind: "grid", col: 4, row: 0 })).toBe("blocked");
+
+    let t = emptyRoom({ table: 3 });
+    t = place(t, "table", { kind: "grid", col: 0, row: 0 });
+    t = place(t, "table", { kind: "grid", col: 2, row: 0 });
+    t = place(t, "table", { kind: "grid", col: 6, row: 0 });
+    expect(dropKind(room, catalog, t, "table", { kind: "grid", col: 1, row: 0 }, "p3")).toBe("blocked");
+  });
+});
+
 describe("rugs", () => {
   it("go under furniture", () => {
     let s = place(start(), "table", { kind: "grid", col: 0, row: 1 });
@@ -218,7 +279,7 @@ describe("moveItem", () => {
 
   it("refuses a blocked spot", () => {
     let s = place(start(), "table", { kind: "grid", col: 0, row: 0 });
-    s = place(s, "table", { kind: "grid", col: 4, row: 0 });
+    s = place(s, "bed", { kind: "grid", col: 4, row: 0 });
     expect(moveItem(room, catalog, s, "p2", { kind: "grid", col: 1, row: 0 })).toBeNull();
   });
 
