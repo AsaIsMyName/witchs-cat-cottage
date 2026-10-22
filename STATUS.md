@@ -1,5 +1,42 @@
 # Status
 
+## Oct 22, 2026 — Cat walks around furniture, climbs if stuck (awaiting playtest)
+
+From the playtest: the cat walked straight (often diagonally) over placed items, and drew on top of things it should pass behind.
+
+**Done**
+- New pure module `src/logic/route.ts` (`findRoute`), with 17 tests in `route.test.ts`. It plans a route on the 12×3 floor grid:
+  - Floor items block their tiles. Rugs and wall items don't.
+  - Diagonal steps only between free tiles, and only when both corner tiles are free.
+  - Furniture with a top (table, stool) can be crossed at an extra cost per tile (`CAT_TIMING.climbCost`, 4 steps), so the cat walks around when it can. Items without a top (cauldron) can't be crossed.
+  - Straight runs collapse into one leg. Each hop on, off, or between two tops is its own leg.
+  - A loaf perch routes onto the table and ends on top. Any other spot on furniture, or one that can't be reached, ends at the nearest free tile the cat can reach, and it reacts from there.
+  - Starting on a blocked tile (something dropped where it stands, or just hopped down from a perch): it first steps to the nearest free tile, preferring forward or sideways over stepping back through the item.
+- `cat-actor.ts`: `walkTo` plans a route and walks it leg by leg (`walkRoute`, `walkLeg`, `arrive`).
+  - Floor legs run at `walkSpeed`, and the cat's depth follows its y every frame, so it passes behind front-row items.
+  - Hops on and off take `CAT_TIMING.hop` (300ms). Walking on top runs at `topWalkSpeed` (60 px/s), drawn above the furniture and anything on it.
+  - Up on furniture mid-walk counts as a `crossing` perch. Moving that furniture, or any interrupt, drops the cat to the floor in front of it.
+  - If the room changes mid-walk, the rest of the route is re-planned at the next leg boundary.
+  - Petting slows every leg, since each one goes through `startMove`. Perch-at-start hop-down, and the visit/roomChanged checks, are unchanged.
+- CLAUDE.md "The cat" → Behavior updated to describe tile routes and climbing.
+- 132 unit tests pass.
+
+**Not verified**
+- Not run in a real browser; `npm run check` can't check movement or drawing order. Asa, please re-test:
+  - Place a table in the middle row, then something on the far side: does the cat walk around the table, not across it, and never cut a corner?
+  - Walk it behind a front-row item: is it hidden behind it while passing, then in front of back-row items?
+  - Wall it in with tables (or a table and a stool) across all three rows: does it hop up, cross, and hop down on the far side? Does a candle on the table stay drawn under it?
+  - A line of cauldrons across all rows: does it stop at the near side and react from there, not walk through?
+  - Put the table down for a loaf: does it hop onto the top from a sensible side and loaf there?
+  - Drop a cauldron right on the cat: does it step off sideways or forward, never teleport?
+  - Move the table while the cat is crossing it: does it drop to the floor in front and carry on, not float?
+  - Pet it mid-route: does the slowdown carry across corners and hops?
+  - Does the walk look smooth, or too zig-zaggy along tile centers?
+
+**Next**
+- Asa playtests the walk.
+- Then back to 3a's playtest and task 3b (the cat's portal moment).
+
 ## Oct 22, 2026 — Milestone 3a: spellbook inventory and portal effects (awaiting playtest)
 
 **Follow-up (Asa's first look): items now sit on the pages**

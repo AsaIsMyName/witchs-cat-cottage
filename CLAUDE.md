@@ -28,7 +28,8 @@ Decided Oct 21, 2026, after the milestone 2 playtest: a scored cat review made d
 - **Always there:** the cat is in the Decorate scene the whole time. It never blocks drops or gets in the way of dragging.
 - **No score, no wrong answers:** reactions are always positive, playful, or curious. Nothing is knocked off or sent back to the tray. The one exception: sliding a rug out from under a napping cat gets an offended blink (sits up, one slow unimpressed blink, a quiet "mrr.", a tail flick, then carries on).
 - **Tags pick reactions:** every decor item has 1–3 tags (cozy, soft, warm, shiny, spooky, fragile, tall, …). Tags choose *which* reaction the cat does, not whether it approves.
-- **Behavior (scripted, no real AI or pathfinding in v1):**
+- **Behavior (scripted, with no real AI; it uses simple tile routes on the floor grid only):**
+  - The cat walks around furniture on the floor tiles and over rugs. If the only way through is over furniture with a top (table, stool), it hops up, crosses, and hops down. It can't cross items without a top (like the cauldron). If it can't reach a spot, it goes as close as it can.
   - Idle: wanders, sits, grooms, or naps, drifting toward cozy spots (e.g. a rug or near the cauldron) when there are some.
   - When an item is placed or moved, the cat finishes what it's doing (including a nap), then strolls over and reacts. Several new items are visited one at a time, at the cat's own pace.
   - When reacting to something on furniture (e.g. a candle on a table), the cat stands on that item's side of the furniture, or the other side if there's no room.

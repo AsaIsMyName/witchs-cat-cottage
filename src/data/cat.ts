@@ -43,6 +43,11 @@ export const OFFENDED_LINE = "mrr.";
 /** Pacing, in milliseconds unless noted. */
 export const CAT_TIMING = {
   walkSpeed: 90, // px per second
+  /** Crossing furniture with a top: slower up there, a short hop on and off. */
+  topWalkSpeed: 60, // px per second
+  hop: 300,
+  /** Route cost (in steps) of each furniture tile crossed on top, so the cat prefers walking around. */
+  climbCost: 4,
   noticeDelay: [800, 1800],
   reactionLength: 2200,
   napLength: [4000, 7000],
