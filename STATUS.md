@@ -1,5 +1,29 @@
 # Status
 
+## Oct 21, 2026 — Gentler petting, moved items end reactions, offended blink (awaiting playtest)
+
+Asa's local playtest: petting cut the cat's actions short, moving an item mid-reaction made the cat restart in place, and the grumpy wake-up was a bit aggressive.
+
+**Done**
+- Petting never cuts the cat's action short. On the move (walking, climbing up, hopping down) it slows to 0.4× for a second, eases back, and keeps going to the same spot, with a tail-up wiggle, a heart, and "purr purr". Mid-reaction or mid-idle-action (sit, groom, nap) it just gets a heart. Only a cat with nothing going on purrs and rolls over. Repeated taps restart the slowdown instead of stacking it. Values are in `CAT_TIMING`.
+- Root cause of the restart: nothing ended a reaction when its item moved. The reaction played out, and meanwhile the drop had queued the item again, so the cat visited it right after. When the cat's stand point hadn't changed (e.g. a candle moved to the other slot of the same table), it reacted again on the spot. Moving furniture didn't count as moving the candle on it at all.
+- Now, if the item the cat is walking to or reacting to is moved or removed (including by moving its table or shelf), the cat stops right away and moves on. A moved item goes to the back of the queue. Picking an item up or a refused drop changes nothing. New pure helpers `displaced` and `toBack` in `src/logic/cat.ts` (tested).
+- The grumpy wake-up is now an offended blink: the cat sits up, turns toward where the rug went, does one slow blink (a head dip, since the placeholder has no eyes), says "mrr.", flicks its tail, then carries on.
+- CLAUDE.md "The cat": petting, moved-item, and rug wake-up bullets updated.
+- 104 unit tests pass. Save format unchanged.
+
+**Not verified**
+- Not run in a real browser (the dev server compiles the module). Asa, please re-test locally:
+  - Pet the cat while it walks, while it climbs onto a table, and while it hops down. Does it slow down and still arrive? Does tapping fast keep it slow forever (it shouldn't)?
+  - Pet it mid-reaction and mid-nap: heart only, nothing interrupted.
+  - Pet it when it's just standing around: the full roll-over.
+  - Move a candle while the cat reacts to it, to the other slot on the same table and to a shelf. Also move the table under it. The cat should stop and move on, and come back to the candle later.
+  - Pick up the item it's reacting to and drop it back where it was (or somewhere it doesn't fit): the reaction carries on.
+  - Slide the rug out from under a napping cat: does the blink read as "unimpressed" with the head dip?
+
+**Next**
+- Asa playtests on a phone.
+
 ## Oct 21, 2026 — Cat fixes from code review, and a grumpy wake-up (awaiting playtest)
 
 Two code reviews of the ambient cat found five bugs; Asa also made three design calls.

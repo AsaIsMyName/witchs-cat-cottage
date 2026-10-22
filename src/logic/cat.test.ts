@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedItems, movedOrRemoved, pickIdle, reactionFor, type CatBehavior, type TaggedCatalog } from "./cat";
+import { changedItems, displaced, movedOrRemoved, pickIdle, toBack, reactionFor, type CatBehavior, type TaggedCatalog } from "./cat";
 import { emptyRoom, moveItem, placeFromTray, removeToTray, type RoomShape, type RoomState, type Target } from "./grid";
 
 const room: RoomShape = { columns: 12, wallRows: 3, floorRows: 3 };
@@ -151,5 +151,39 @@ describe("movedOrRemoved", () => {
     const swapped = moveItem(room, catalog, before, "p1", grid(8, 2))!;
     expect(movedOrRemoved(before, swapped, "p1")).toBe(true);
     expect(movedOrRemoved(before, removeToTray(before, "p1"), "p1")).toBe(true);
+  });
+});
+
+describe("displaced", () => {
+  const before = build([
+    ["table", grid(0, 0)], // p1
+    ["candle", on("p1", 0)], // p2
+    ["cauldron", grid(6, 0)], // p3
+  ]);
+
+  it("is false when only other things change", () => {
+    expect(displaced(before, before, "p2")).toBe(false);
+    expect(displaced(before, moveItem(room, catalog, before, "p3", grid(8, 2))!, "p2")).toBe(false);
+  });
+
+  it("is true when the item moves to another slot or is removed", () => {
+    expect(displaced(before, moveItem(room, catalog, before, "p2", on("p1", 1))!, "p2")).toBe(true);
+    expect(displaced(before, removeToTray(before, "p2"), "p2")).toBe(true);
+  });
+
+  it("is true when its furniture is moved or removed, carrying it along", () => {
+    expect(displaced(before, moveItem(room, catalog, before, "p1", grid(2, 2))!, "p2")).toBe(true);
+    expect(displaced(before, removeToTray(before, "p1"), "p2")).toBe(true);
+  });
+});
+
+describe("toBack", () => {
+  it("moves an item behind everything else pending", () => {
+    expect(toBack(["p1", "p2", "p3"], "p1", true)).toEqual(["p2", "p3", "p1"]);
+    expect(toBack(["p2"], "p1", true)).toEqual(["p2", "p1"]);
+  });
+
+  it("drops an item that is gone", () => {
+    expect(toBack(["p1", "p2"], "p1", false)).toEqual(["p2"]);
   });
 });

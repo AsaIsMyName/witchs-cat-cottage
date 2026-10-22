@@ -2,10 +2,19 @@
 // Decisions come from src/logic/cat.ts; this file only animates them.
 
 import * as Phaser from "phaser";
-import { CAT_BEHAVIOR, CAT_TIMING, GRUMPY_LINE, IDLE_LINES, PET_LINE, REACTION_LINES } from "../data/cat";
+import { CAT_BEHAVIOR, CAT_TIMING, IDLE_LINES, OFFENDED_LINE, PET_LINE, REACTION_LINES } from "../data/cat";
 import { CATALOG } from "../data/items";
 import { BEDROOM } from "../data/rooms";
-import { changedItems, movedOrRemoved, pickIdle, reactionFor, type IdleAction, type Reaction } from "../logic/cat";
+import {
+  changedItems,
+  displaced,
+  movedOrRemoved,
+  pickIdle,
+  reactionFor,
+  toBack,
+  type IdleAction,
+  type Reaction,
+} from "../logic/cat";
 import type { RoomState } from "../logic/grid";
 import { DEPTH_FLOOR, FLOOR_Y, GAME_WIDTH, ItemView, ROOM_X, TEXT_LIGHT, TILE, textStyle } from "./room-view";
 
@@ -31,6 +40,10 @@ interface Point {
 
 export class CatActor {
   private readonly cat: Phaser.GameObjects.Container;
+  private readonly tail: Phaser.GameObjects.Rectangle;
+  /** Head and ears, which dip together for a slow blink. */
+  private readonly face: Phaser.GameObjects.Rectangle[];
+  private readonly faceY: number[];
   private readonly bubble: Phaser.GameObjects.Text;
   private mode: Mode = "idle";
   private pose: Pose = "resting";
@@ -41,10 +54,20 @@ export class CatActor {
   private readonly queue: string[] = [];
   private facing: 1 | -1 = 1;
   private perch?: { uid: string; groundY: number };
-  /** The rug the cat is napping on; moving or removing it wakes the cat up grumpy. */
+  /** The rug the cat is napping on; moving or removing it wakes the cat with an offended blink. */
   private napRug?: string;
   /** The queued item the cat is visiting; it goes back in the queue if the cat is interrupted first. */
   private current?: string;
+  /** The item the cat is walking to or reacting to (queued or a cozy spot); moving it ends the visit. */
+  private visiting?: string;
+  /** True while a reaction, idle action, pet, or blink plays; petting then only gets a heart. */
+  private acting = false;
+  /** The tween carrying the cat somewhere (a walk, climb, or hop down); petting slows it down. */
+  private move?: Phaser.Tweens.Tween;
+  /** Petted on the move: the speed the cat moves at, and the counter easing it back to 1. */
+  private petScale = 1;
+  private petEase?: Phaser.Tweens.Tween;
+  private pets = 0;
   /** Where the cat's feet belong if a hop or jump is cut short, so it never stays in mid-air. */
   private restY?: number;
   /** Item views the player is holding; wobbles leave them alone. */
@@ -56,7 +79,8 @@ export class CatActor {
     private readonly getState: () => RoomState,
     private readonly getViews: () => Map<string, ItemView>,
   ) {
-    this.cat = this.makeCat();
+    ({ cat: this.cat, tail: this.tail, face: this.face } = this.makeCat());
+    this.faceY = this.face.map((part) => part.y);
     const start = floorPoint(Phaser.Math.Between(2, BEDROOM.columns - 3), BEDROOM.floorRows - 1);
     this.cat.setPosition(start.x, start.y);
     this.updateDepth();
@@ -70,19 +94,31 @@ export class CatActor {
 
   /**
    * Call after every room change, once the item views have been rebuilt. Changed items join the
-   * cat's queue; it gets to them after finishing what it's doing. The exceptions: if its perch was
-   * moved or removed, it hops down right away; if the rug it's napping on was, it wakes up grumpy.
+   * cat's queue; it gets to them after finishing what it's doing. The exception is the item it's
+   * visiting: if that (or the furniture carrying it) was moved or removed, the visit ends right away
+   * and a moved item goes to the back of the queue. Off a moved perch the cat hops down; woken by a
+   * moved rug it gives an offended blink; otherwise it just moves on.
    */
   roomChanged(prev: RoomState, next: RoomState): void {
     for (const uid of changedItems(prev, next)) if (!this.queue.includes(uid)) this.queue.push(uid);
+
+    const target = this.visiting;
+    if (!target || !displaced(prev, next, target)) return;
+    const reordered = toBack(this.queue, target, next.placements.some((p) => p.uid === target));
+    this.queue.splice(0, this.queue.length, ...reordered);
+    this.current = undefined; // already requeued, so interrupt() mustn't put it back at the front
 
     if (this.perch && movedOrRemoved(prev, next, this.perch.uid)) {
       this.interrupt();
       this.mode = "idle";
       this.hopDown(() => this.later(between(CAT_TIMING.noticeDelay), () => this.next()));
     } else if (this.napRug && movedOrRemoved(prev, next, this.napRug)) {
+      const rug = this.getViews().get(this.napRug);
       this.interrupt();
-      this.grumble();
+      this.offendedBlink(rug?.centerX);
+    } else {
+      this.interrupt();
+      this.finish();
     }
   }
 
@@ -112,15 +148,66 @@ export class CatActor {
     return Math.abs(x - this.cat.x) <= halfW && y <= this.cat.y + 6 && y >= this.cat.y - (BODY_H + HEAD + 10);
   }
 
+  /**
+   * Petting never cuts the cat's action short. On the move it slows down happily and keeps going;
+   * mid-reaction or mid-idle-action it just gets a heart; only a cat with nothing on rolls over.
+   */
   pet(): void {
-    this.interrupt();
-    this.mode = "busy";
-    this.say(PET_LINE);
     this.floatHeart();
+    if (this.move) return this.petOnTheMove();
+    if (this.acting || this.mode === "busy") return;
+    this.interrupt(); // nothing is in progress, so this only drops the pending "what next" timer
+    this.mode = "busy";
+    this.acting = true;
+    this.say(PET_LINE);
     this.tween({ targets: this.cat, angle: this.facing * 360, duration: 700, ease: "Quad.easeInOut" }, () => {
       this.cat.angle = 0;
       this.later(1200, () => this.finish());
     });
+  }
+
+  /**
+   * Slows the current movement (and any leg that follows) for a moment, then eases back. Another
+   * tap restarts the slowdown rather than stacking it. The tail goes up and wiggles, with a purr.
+   */
+  private petOnTheMove(): void {
+    const { petSlowdown, petSlowFor, petEaseBack } = CAT_TIMING;
+    this.petEase?.remove();
+    this.setPetScale(petSlowdown);
+    this.petEase = this.scene.tweens.addCounter({
+      from: 0,
+      to: petSlowFor + petEaseBack,
+      duration: petSlowFor + petEaseBack,
+      onUpdate: (tween) => {
+        const t = Math.max(0, (tween.getValue() ?? 0) - petSlowFor) / petEaseBack;
+        this.setPetScale(Phaser.Math.Linear(petSlowdown, 1, Math.min(1, t)));
+      },
+      onComplete: () => {
+        this.petEase = undefined;
+        this.setPetScale(1);
+      },
+    });
+
+    this.scene.tweens.killTweensOf(this.tail);
+    this.tail.angle = 0;
+    this.scene.tweens.add({
+      targets: this.tail,
+      angle: -25,
+      duration: 120,
+      yoyo: true,
+      repeat: 3,
+      onComplete: () => (this.tail.angle = 0),
+    });
+    this.say(PET_LINE);
+    const pet = ++this.pets;
+    this.scene.time.delayedCall(petSlowFor, () => {
+      if (pet === this.pets && this.move && this.bubble.text === PET_LINE) this.bubble.setVisible(false);
+    });
+  }
+
+  private setPetScale(scale: number): void {
+    this.petScale = scale;
+    if (this.move) this.move.timeScale = scale;
   }
 
   private next(): void {
@@ -132,6 +219,7 @@ export class CatActor {
       if (!placement || !views.has(uid)) continue;
       this.mode = "busy";
       this.current = uid;
+      this.visiting = uid;
       this.visit(uid, reactionFor(CATALOG, state, placement, CAT_BEHAVIOR.rules), CAT_TIMING.reactionLength);
       return;
     }
@@ -141,6 +229,7 @@ export class CatActor {
     if (plan.kind === "wander") this.wander(plan.col, plan.row, plan.action);
     else if (views.has(plan.uid)) {
       this.mode = "busy";
+      this.visiting = plan.uid;
       this.visit(plan.uid, plan.reaction, between(CAT_TIMING.napLength));
     } else this.later(between(CAT_TIMING.idleGap), () => this.next());
   }
@@ -179,6 +268,7 @@ export class CatActor {
 
   private wander(col: number, row: number, action: IdleAction): void {
     this.walkTo(floorPoint(col, row), () => {
+      this.acting = true;
       this.restY = this.cat.y;
       this.say(IDLE_LINES[action]);
       if (action === "nap") this.nap();
@@ -189,6 +279,7 @@ export class CatActor {
   }
 
   private react(reaction: Reaction, view: ItemView): void {
+    this.acting = true;
     this.restY = this.cat.y;
     this.say(REACTION_LINES[reaction]);
     switch (reaction) {
@@ -246,7 +337,7 @@ export class CatActor {
       this.turnTo(point.x);
       this.cat.setDepth(Math.max(this.cat.depth, depthAt(point.y)));
       const duration = Math.max(150, (distance / CAT_TIMING.walkSpeed) * 1000);
-      this.tween({ targets: this.cat, x: point.x, y: point.y, duration, ease: "Linear" }, () => {
+      this.startMove({ targets: this.cat, x: point.x, y: point.y, duration, ease: "Linear" }, () => {
         this.restY = undefined;
         this.pose = "resting";
         this.updateDepth();
@@ -261,7 +352,7 @@ export class CatActor {
     this.perch = undefined;
     this.pose = "walking";
     this.restY = groundY;
-    this.tween({ targets: this.cat, y: groundY, duration: 250, ease: "Quad.easeIn" }, () => {
+    this.startMove({ targets: this.cat, y: groundY, duration: 250, ease: "Quad.easeIn" }, () => {
       this.restY = undefined;
       this.pose = "resting";
       this.updateDepth();
@@ -269,30 +360,57 @@ export class CatActor {
     });
   }
 
-  /** Woken by its rug sliding away: puffs up, shakes it off, then gets on with its day. */
-  private grumble(): void {
+  /** A movement tween: petting can slow it down, and the speech bubble rides along. */
+  private startMove(config: Phaser.Types.Tweens.TweenBuilderConfig, then: () => void): void {
+    this.move = this.tween({ ...config, onUpdate: () => this.followBubble() }, () => {
+      this.move = undefined;
+      then();
+    });
+    this.move.timeScale = this.petScale;
+  }
+
+  /**
+   * Woken by its rug sliding away: sits up, turns toward where the rug went (`towardX`, if it's
+   * still in the room), gives one slow unimpressed blink and a quiet "mrr.", flicks its tail once,
+   * then gets on with its day. The placeholder cat has no eyes, so the blink is a slow dip of the head.
+   */
+  private offendedBlink(towardX?: number): void {
     this.mode = "busy";
-    this.say(GRUMPY_LINE);
-    this.tween({ targets: this.cat, scaleX: this.facing * 1.2, scaleY: 1.3, duration: 150, ease: "Back.easeOut" });
-    this.tween({ targets: this.cat, x: this.cat.x + 2, duration: 50, yoyo: true, repeat: 5, delay: 150 });
-    this.later(CAT_TIMING.grumpyLength, () => this.finish());
+    this.acting = true;
+    this.cat.scaleY = 0.6; // still curled up from the nap
+    this.tween({ targets: this.cat, scaleY: 1, duration: 250, ease: "Quad.easeOut" });
+    if (towardX !== undefined) this.turnTo(towardX);
+    const blink = CAT_TIMING.offendedBlink;
+    this.tween({ targets: this.face, y: "+=2", duration: blink / 2, yoyo: true, delay: 300, ease: "Sine.easeInOut" }, () => {
+      this.say(OFFENDED_LINE);
+      this.tween({ targets: this.tail, angle: -30, duration: 110, yoyo: true, ease: "Quad.easeOut" });
+    });
+    this.later(CAT_TIMING.offendedLength, () => this.finish());
   }
 
   private finish(): void {
     this.cat.setScale(this.facing, 1);
+    this.resetParts();
     this.bubble.setVisible(false);
     this.mode = "idle";
     this.pose = "resting";
+    this.acting = false;
     this.current = undefined;
+    this.visiting = undefined;
     this.napRug = undefined;
     this.restY = undefined;
     this.later(between(CAT_TIMING.idleGap), () => this.next());
   }
 
-  /** Cuts the current action short. An unfinished visit goes back to the front of the queue. */
+  /** Cuts the current action short. An unfinished queued visit goes back to the front of the queue. */
   private interrupt(): void {
     this.token++;
     this.scene.tweens.killTweensOf(this.cat);
+    this.move = undefined;
+    this.petEase?.remove();
+    this.petEase = undefined;
+    this.petScale = 1;
+    this.resetParts();
     if (this.restY !== undefined) {
       this.cat.y = this.restY;
       this.restY = undefined;
@@ -300,6 +418,8 @@ export class CatActor {
     }
     if (this.current && !this.queue.includes(this.current)) this.queue.unshift(this.current);
     this.current = undefined;
+    this.visiting = undefined;
+    this.acting = false;
     this.napRug = undefined;
     this.cat.setScale(this.facing, 1);
     this.cat.angle = 0;
@@ -325,8 +445,21 @@ export class CatActor {
   private say(text: string): void {
     if (!text) return void this.bubble.setVisible(false);
     this.bubble.setText(text).setVisible(true);
+    this.followBubble();
+  }
+
+  /** Keeps a visible speech bubble above the cat, e.g. a purr while it walks. */
+  private followBubble(): void {
+    if (!this.bubble.visible) return;
     const half = this.bubble.width / 2;
     this.bubble.setPosition(Phaser.Math.Clamp(this.cat.x, half + 4, GAME_WIDTH - half - 4), this.cat.y - BUBBLE_OFFSET);
+  }
+
+  /** Puts the tail and head back after a wiggle, flick, or blink. */
+  private resetParts(): void {
+    this.scene.tweens.killTweensOf([this.tail, ...this.face]);
+    this.tail.angle = 0;
+    this.face.forEach((part, i) => (part.y = this.faceY[i]));
   }
 
   private floatHeart(): void {
@@ -375,10 +508,10 @@ export class CatActor {
     });
   }
 
-  /** Adds a tween on the cat; `then` runs when it completes, unless the cat was interrupted. */
-  private tween(config: Phaser.Types.Tweens.TweenBuilderConfig, then?: () => void): void {
+  /** Adds a tween on the cat (or its parts); `then` runs when it completes, unless the cat was interrupted. */
+  private tween(config: Phaser.Types.Tweens.TweenBuilderConfig, then?: () => void): Phaser.Tweens.Tween {
     const token = this.token;
-    this.scene.tweens.add({
+    return this.scene.tweens.add({
       ...config,
       onComplete: () => {
         if (then && token === this.token) then();
@@ -387,19 +520,23 @@ export class CatActor {
   }
 
   /** A placeholder cat built from rectangles, drawn facing right with its feet at (0, 0). */
-  private makeCat(): Phaser.GameObjects.Container {
+  private makeCat(): {
+    cat: Phaser.GameObjects.Container;
+    tail: Phaser.GameObjects.Rectangle;
+    face: Phaser.GameObjects.Rectangle[];
+  } {
     const s = this.scene;
     const shape = (x: number, y: number, w: number, h: number) =>
       s.add.rectangle(x, y, w, h, COLOR_CAT).setOrigin(0.5, 1).setStrokeStyle(2, COLOR_OUTLINE);
     const headX = BODY_W / 2 - 2;
     const headBottom = -BODY_H + 4;
-    return s.add.container(0, 0, [
-      shape(-BODY_W / 2 - 1, -BODY_H + 4, 4, 12), // tail
-      shape(0, 0, BODY_W, BODY_H), // body
+    const tail = shape(-BODY_W / 2 - 1, -BODY_H + 4, 4, 12);
+    const face = [
       shape(headX, headBottom, HEAD, HEAD), // head
       shape(headX - 3, headBottom - HEAD + 1, 3, 4), // ears
       shape(headX + 3, headBottom - HEAD + 1, 3, 4),
-    ]);
+    ];
+    return { cat: s.add.container(0, 0, [tail, shape(0, 0, BODY_W, BODY_H), ...face]), tail, face };
   }
 }
 

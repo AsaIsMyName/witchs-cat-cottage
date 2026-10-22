@@ -1,7 +1,7 @@
 // The ambient cat's decisions: how it reacts to an item, what it does when idle, and which items
 // are new enough to go look at. Plain TypeScript, no Phaser, so it can be unit tested.
-// The cat never judges: every reaction is positive, playful, or curious. (The one exception, a
-// grumpy wake-up when its rug is pulled out from under a nap, isn't about the item; see cat-actor.ts.)
+// The cat never judges: every reaction is positive, playful, or curious. (The one exception, an
+// offended blink when its rug is pulled out from under a nap, isn't about the item; see cat-actor.ts.)
 
 import { targetOf, type ItemShape, type Placement, type RoomShape, type RoomState } from "./grid";
 
@@ -87,6 +87,22 @@ export function changedItems(prev: RoomState, next: RoomState): string[] {
 /** Whether item `uid` was removed or moved between `prev` and `next` (e.g. the rug or table the cat is on). */
 export function movedOrRemoved(prev: RoomState, next: RoomState, uid: string): boolean {
   return !next.placements.some((p) => p.uid === uid) || changedItems(prev, next).includes(uid);
+}
+
+/**
+ * Whether item `uid` was moved or removed, counting the furniture or shelf it sits on, which
+ * carries it. A reaction to an item that this is true for ends right away.
+ */
+export function displaced(prev: RoomState, next: RoomState, uid: string): boolean {
+  if (movedOrRemoved(prev, next, uid)) return true;
+  const p = prev.placements.find((q) => q.uid === uid);
+  return p?.layer === "surface" && movedOrRemoved(prev, next, p.hostUid);
+}
+
+/** `queue` with `uid` moved to the back, so other pending items come first. Dropped if `present` is false. */
+export function toBack(queue: string[], uid: string, present: boolean): string[] {
+  const rest = queue.filter((q) => q !== uid);
+  return present ? [...rest, uid] : rest;
 }
 
 export function spotOf(state: RoomState, p: Placement): Spot {

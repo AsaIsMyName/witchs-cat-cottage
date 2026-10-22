@@ -25,15 +25,16 @@ One room takes about 5–10 minutes: a short clean, then a longer decorate with 
 Decided Oct 21, 2026, after the milestone 2 playtest: a scored cat review made decorating feel like a puzzle with wrong answers, and didn't make Asa want to rearrange. The cat is now an ambient companion that lives in the room while you decorate.
 
 - **Always there:** the cat is in the Decorate scene the whole time. It never blocks drops or gets in the way of dragging.
-- **No score, no wrong answers:** reactions are always positive, playful, or curious. Nothing is knocked off or sent back to the tray. The one exception: sliding a rug out from under a napping cat gets a short, mild, cartoonish grumpy wake-up (puffs up, shakes, "hmph!").
+- **No score, no wrong answers:** reactions are always positive, playful, or curious. Nothing is knocked off or sent back to the tray. The one exception: sliding a rug out from under a napping cat gets an offended blink (sits up, one slow unimpressed blink, a quiet "mrr.", a tail flick, then carries on).
 - **Tags pick reactions:** every decor item has 1–3 tags (cozy, soft, warm, shiny, spooky, fragile, tall, …). Tags choose *which* reaction the cat does, not whether it approves.
 - **Behavior (scripted, no real AI or pathfinding in v1):**
   - Idle: wanders, sits, grooms, or naps, drifting toward cozy spots (e.g. a rug or near the cauldron) when there are some.
   - When an item is placed or moved, the cat finishes what it's doing (including a nap), then strolls over and reacts. Several new items are visited one at a time, at the cat's own pace.
-  - Player actions never interrupt the cat's flow (except the two cases below). While the player drags something, an idle cat that's sitting still glances toward it; a walking, napping, or reacting cat carries on.
-  - Tapping the cat pets it: it purrs, a heart floats up, and it rolls over. A drag that starts on the cat still picks up the item underneath.
+  - Player actions never interrupt the cat's flow (except the cases below). While the player drags something, an idle cat that's sitting still glances toward it; a walking, napping, or reacting cat carries on.
+  - Tapping the cat pets it. If it's idle, it purrs, a heart floats up, and it rolls over. If it's on the move, it slows down happily while petted and keeps going. If it's reacting, a heart floats up and it carries on. Petting never cuts the cat's action short. A drag that starts on the cat still picks up the item underneath.
+  - If the item the cat is reacting to is moved or removed (including by moving the furniture or shelf it sits on), it ends that reaction and moves on to the next thing. A moved item is visited again later, after anything else that's waiting.
   - If the item the cat is sitting on is removed or moved, the cat hops down, unbothered.
-  - If the rug the cat is napping on is moved or removed, it wakes up right away, grumpy, then carries on; it may stroll over to the moved rug later like any other changed item.
+  - If the rug the cat is napping on is moved or removed, it gives an offended blink: sits up, one slow unimpressed blink, a quiet "mrr.", a tail flick, then carries on; it may stroll over to the moved rug later like any other changed item.
 - **Reactions (first match wins; values in `src/data/cat.ts`):**
   - soft (rug): curls up and naps.
   - shiny or fragile on a shelf or the wall: reaches up and paws at it; the item wobbles but stays put.

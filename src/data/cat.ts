@@ -37,8 +37,8 @@ export const IDLE_LINES: Record<IdleAction, string> = {
 
 export const PET_LINE = "purr purr";
 
-/** The one grumpy moment: its rug was pulled out from under a nap. Mild, and never about the item. */
-export const GRUMPY_LINE = "hmph!";
+/** The one offended moment: its rug was pulled out from under a nap. Quiet, and never about the item. */
+export const OFFENDED_LINE = "mrr.";
 
 /** Pacing, in milliseconds unless noted. */
 export const CAT_TIMING = {
@@ -47,5 +47,11 @@ export const CAT_TIMING = {
   reactionLength: 2200,
   napLength: [4000, 7000],
   idleGap: [1500, 4000],
-  grumpyLength: 1600,
+  /** Petted on the move: it slows to this fraction of its speed, holds it, then eases back to full speed. */
+  petSlowdown: 0.4,
+  petSlowFor: 1000,
+  petEaseBack: 400,
+  /** Rug pulled out from under a nap: sits up, one slow blink, "mrr.", a tail flick, then carries on. */
+  offendedBlink: 700,
+  offendedLength: 2200,
 };
