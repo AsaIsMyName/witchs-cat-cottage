@@ -11,6 +11,7 @@ import {
   type RoomState,
   type Target,
 } from "../logic/grid";
+import { CatActor } from "./cat-actor";
 import { loadRoom, saveRoom } from "./room-store";
 import {
   DEPTH_FLOOR,
@@ -20,7 +21,6 @@ import {
   ItemView,
   ROOM_X,
   SURFACE_ITEM_H,
-  TEXT_LIGHT,
   TEXT_MUTED,
   TILE,
   TRAY_Y,
@@ -64,6 +64,9 @@ export class DecorateScene extends Phaser.Scene {
   private resetButton!: Phaser.GameObjects.Text;
   private resetConfirmTimer?: Phaser.Time.TimerEvent;
   private drag?: Drag;
+  private cat!: CatActor;
+  /** Whether the current press turned into a drag; a press that didn't can pet the cat. */
+  private dragged = false;
 
   constructor() {
     super("Decorate");
@@ -84,18 +87,22 @@ export class DecorateScene extends Phaser.Scene {
     this.input.on("dragstart", this.onDragStart, this);
     this.input.on("drag", this.onDrag, this);
     this.input.on("dragend", this.onDragEnd, this);
-    this.addDoneButton();
+    this.input.on("pointerdown", () => (this.dragged = false));
+    this.input.on("pointerup", (pointer: Phaser.Input.Pointer) => {
+      if (!this.dragged && this.cat.hitTest(pointer.worldX, pointer.worldY)) this.cat.pet();
+    });
     this.addResetButton();
     this.renderItems();
+    this.cat = new CatActor(this, () => this.state, () => this.placedViews);
   }
 
-  private addDoneButton(): void {
-    this.add
-      .text(10, TRAY_Y + 4, "▶ show the cat", textStyle(10, TEXT_LIGHT))
-      .setPadding(6, 4, 6, 4)
-      .setBackgroundColor("#3d3357")
-      .setInteractive({ useHandCursor: true })
-      .on("pointerup", () => this.scene.start("CatReview"));
+  /** Applies a new room state: saves it, redraws, and lets the cat notice what changed. */
+  private setState(next: RoomState): void {
+    const prev = this.state;
+    this.state = next;
+    saveRoom(next);
+    this.renderItems();
+    this.cat.roomChanged(prev, next);
   }
 
   private addResetButton(): void {
@@ -115,9 +122,7 @@ export class DecorateScene extends Phaser.Scene {
       return;
     }
     this.cancelReset();
-    this.state = clearRoom(this.state);
-    saveRoom(this.state);
-    this.renderItems();
+    this.setState(clearRoom(this.state));
   }
 
   private cancelReset(): void {
@@ -174,8 +179,10 @@ export class DecorateScene extends Phaser.Scene {
           })
         : [];
     this.drag = { view, source, offsetX: pointer.worldX - view.x, offsetY: pointer.worldY - view.y, children };
+    this.dragged = true;
     view.setDepth(DEPTH_DRAGGING);
     for (const child of children) child.view.setDepth(DEPTH_DRAGGING + 2);
+    this.cat.startWatching(pointer.worldX);
   }
 
   private onDrag(pointer: Phaser.Input.Pointer): void {
@@ -186,6 +193,7 @@ export class DecorateScene extends Phaser.Scene {
     drag.view.setPosition(x, y);
     for (const child of drag.children) child.view.setPosition(x + child.dx, y + child.dy);
     this.drawHighlight(drag, pointer);
+    this.cat.face(pointer.worldX);
   }
 
   private onDragEnd(pointer: Phaser.Input.Pointer): void {
@@ -193,6 +201,7 @@ export class DecorateScene extends Phaser.Scene {
     this.drag = undefined;
     this.highlight.clear();
     if (!drag) return;
+    this.cat.stopWatching();
 
     let next: RoomState | null = null;
     if (pointer.worldY >= TRAY_Y) {
@@ -206,12 +215,9 @@ export class DecorateScene extends Phaser.Scene {
             : moveItem(BEDROOM, CATALOG, this.state, drag.source.uid, target);
       }
     }
-    if (next) {
-      this.state = next;
-      saveRoom(this.state);
-    }
-    // Re-render either way: a refused drop snaps back to where it came from.
-    this.renderItems();
+    // A refused drop just re-renders, which snaps the item back to where it came from.
+    if (next) this.setState(next);
+    else this.renderItems();
   }
 
   private targetFor(drag: Drag, pointer: Phaser.Input.Pointer): Target | null {

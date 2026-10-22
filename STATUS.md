@@ -1,6 +1,23 @@
 # Status
 
-## Oct 21, 2026 — Milestone 2: Cat reactor (built, awaiting playtest)
+## Oct 21, 2026 — Milestone 2, take 2: Ambient cat (built, awaiting playtest)
+
+Scored-review playtest: nothing broke, but **no-go** on the design. The score made decorating feel like a puzzle with wrong answers, and the cat didn't make Asa want to rearrange. CLAUDE.md now describes the cat as an ambient companion.
+
+**Done**
+- Removed the score, hearts, knock-overs, the "show the cat" button, and the CatReview scene.
+- The cat lives in the Decorate scene (`src/scenes/cat-actor.ts`): wanders, sits, grooms, naps, drifts to cozy spots; walks over to react to items you place or move (one at a time, at its own pace); turns to watch while you drag; tap it to pet it; hops down if its perch is moved or removed.
+- Reactions by tag (`src/data/cat.ts`): nap on soft, paw at shiny/fragile things up high (they wobble, never fall), warm up by warm things, bat at shiny things, loaf on tables/stools, stare at spooky things, sniff anything else.
+- Decision logic in `src/logic/cat.ts` with tests (97 total pass).
+
+**Not verified**
+- Reactions, watching, and petting haven't run in a real browser yet; screenshots confirm the cat draws and the scene runs.
+
+**Next**
+- Asa playtests. Go/no-go question: *does having the cat around make decorating feel cozier and make you want to keep going?*
+- Then decide on the "cat moments" journal (open question in CLAUDE.md).
+
+## Oct 21, 2026 — Milestone 2, take 1: Scored cat review (dropped)
 
 Different-size swap playtest: passed. Milestone 1 closed.
 

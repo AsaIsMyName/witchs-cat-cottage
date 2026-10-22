@@ -1,26 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { applyKnockovers, heartsFor, reviewRoom, visitOrder, type CatPrefs, type TaggedCatalog } from "./cat";
-import { emptyRoom, placeFromTray, type RoomShape, type RoomState, type Target } from "./grid";
+import { changedItems, pickIdle, reactionFor, type CatBehavior, type TaggedCatalog } from "./cat";
+import { emptyRoom, moveItem, placeFromTray, type RoomShape, type RoomState, type Target } from "./grid";
 
 const room: RoomShape = { columns: 12, wallRows: 3, floorRows: 3 };
 
 const catalog: TaggedCatalog = {
   shelf: { id: "shelf", layer: "wall", width: 1, height: 1, hasSurface: true, tags: ["tall"] },
+  clock: { id: "clock", layer: "wall", width: 1, height: 1, tags: ["shiny"] },
+  chart: { id: "chart", layer: "wall", width: 1, height: 1, tags: ["spooky"] },
   frame: { id: "frame", layer: "wall", width: 1, height: 1, tags: ["cozy"] },
   table: { id: "table", layer: "floor", width: 2, height: 1, hasSurface: true, tags: ["cozy"] },
+  cauldron: { id: "cauldron", layer: "floor", width: 1, height: 1, tags: ["warm", "spooky"] },
   rug: { id: "rug", layer: "rug", width: 2, height: 1, tags: ["soft"] },
   candle: { id: "candle", layer: "surface", width: 1, height: 1, tags: ["warm", "shiny"] },
   potion: { id: "potion", layer: "surface", width: 1, height: 1, tags: ["shiny", "fragile"] },
 };
 
-const prefs: CatPrefs = {
-  likes: ["soft", "warm", "shiny"],
-  dislikes: [{ tag: "fragile", on: ["high"] }],
-  points: { liked: 15, disliked: -20 },
+const behavior: CatBehavior = {
+  rules: [
+    { reaction: "nap", tags: ["soft"] },
+    { reaction: "paw-up", tags: ["shiny", "fragile"], on: ["high", "wall"] },
+    { reaction: "warm", tags: ["warm"] },
+    { reaction: "bat", tags: ["shiny"] },
+    { reaction: "loaf", hasSurface: true, on: ["floor"] },
+    { reaction: "stare", tags: ["spooky"] },
+  ],
+  cozyReactions: ["nap", "warm", "loaf"],
+  cozyChance: 0.5,
 };
 
+const grid = (col: number, row: number): Target => ({ kind: "grid", col, row });
+const on = (hostUid: string, slot = 0): Target => ({ kind: "surface", hostUid, slot });
+
 function build(steps: [string, Target][]): RoomState {
-  let s = emptyRoom({ shelf: 2, frame: 1, table: 1, rug: 1, candle: 3, potion: 3 });
+  let s = emptyRoom(Object.fromEntries(Object.keys(catalog).map((id) => [id, 3])));
   for (const [itemId, target] of steps) {
     const next = placeFromTray(room, catalog, s, itemId, target);
     if (!next) throw new Error(`could not place ${itemId}`);
@@ -29,96 +42,92 @@ function build(steps: [string, Target][]): RoomState {
   return s;
 }
 
-const grid = (col: number, row: number): Target => ({ kind: "grid", col, row });
-const on = (hostUid: string, slot = 0): Target => ({ kind: "surface", hostUid, slot });
+/** Returns the given values in order, like a scripted Math.random. */
+function scripted(...values: number[]): () => number {
+  let i = 0;
+  return () => values[i++ % values.length];
+}
 
-describe("reviewRoom reactions", () => {
-  it("likes items with a liked tag", () => {
-    const review = reviewRoom(catalog, build([["rug", grid(0, 0)]]), prefs);
-    expect(review.visits).toEqual([{ uid: "p1", itemId: "rug", reaction: "like", tag: "soft" }]);
+describe("reactionFor", () => {
+  const s = build([
+    ["rug", grid(0, 2)], // p1
+    ["shelf", grid(3, 0)], // p2
+    ["potion", on("p2")], // p3: fragile, high
+    ["table", grid(5, 1)], // p4
+    ["potion", on("p4", 0)], // p5: shiny, low
+    ["candle", on("p4", 1)], // p6: warm + shiny, low
+    ["cauldron", grid(9, 2)], // p7
+    ["clock", grid(8, 0)], // p8
+    ["chart", grid(9, 0)], // p9
+    ["frame", grid(10, 0)], // p10
+  ]);
+  const reaction = (uid: string) => reactionFor(catalog, s, s.placements.find((p) => p.uid === uid)!, behavior.rules);
+
+  it.each([
+    ["p1", "nap", "naps on a rug"],
+    ["p3", "paw-up", "paws at a potion on a shelf"],
+    ["p4", "loaf", "loafs on a table"],
+    ["p5", "bat", "bats at a potion within reach"],
+    ["p6", "warm", "warms up by a candle"],
+    ["p7", "warm", "warms up by the cauldron before staring at it"],
+    ["p8", "paw-up", "reaches up to a shiny clock on the wall"],
+    ["p9", "stare", "stares at spooky things"],
+    ["p10", "sniff", "sniffs anything else"],
+    ["p2", "sniff", "sniffs a shelf, since only floor furniture is loafed on"],
+  ])("%s → %s (%s)", (uid, expected) => {
+    expect(reaction(uid)).toBe(expected);
   });
 
-  it("sniffs items with no liked tag", () => {
-    const review = reviewRoom(catalog, build([["frame", grid(0, 0)]]), prefs);
-    expect(review.visits[0].reaction).toBe("neutral");
-  });
-
-  it("dislikes a fragile item on a shelf but likes it on a table", () => {
-    const s = build([
+  it("paws at a candle on a shelf instead of warming up", () => {
+    const t = build([
       ["shelf", grid(0, 0)],
-      ["potion", on("p1")],
-      ["table", grid(4, 2)],
-      ["potion", on("p3")],
+      ["candle", on("p1")],
     ]);
-    const reactions = Object.fromEntries(reviewRoom(catalog, s, prefs).visits.map((v) => [v.uid, [v.reaction, v.tag]]));
-    expect(reactions.p2).toEqual(["dislike", "fragile"]);
-    expect(reactions.p4).toEqual(["like", "shiny"]);
-  });
-
-  it("lets a dislike rule with no spot apply anywhere", () => {
-    const strict: CatPrefs = { ...prefs, dislikes: [{ tag: "cozy" }] };
-    const review = reviewRoom(catalog, build([["frame", grid(0, 0)]]), strict);
-    expect(review.visits[0]).toMatchObject({ reaction: "dislike", tag: "cozy" });
+    expect(reactionFor(catalog, t, t.placements[1], behavior.rules)).toBe("paw-up");
   });
 });
 
-describe("reviewRoom score", () => {
-  it("is 0 for an empty room", () => {
-    expect(reviewRoom(catalog, emptyRoom({}), prefs)).toEqual({ visits: [], score: 0 });
+describe("pickIdle", () => {
+  it("wanders anywhere on the floor in an empty room", () => {
+    const plan = pickIdle(catalog, emptyRoom({}), room, behavior, scripted(0.99, 0.5, 0.4));
+    expect(plan).toEqual({ kind: "wander", col: 11, row: 1, action: "groom" });
   });
 
-  it("adds likes and subtracts dislikes", () => {
+  it("sometimes drifts to a cozy spot", () => {
     const s = build([
-      ["rug", grid(0, 0)],
-      ["table", grid(4, 0)],
-      ["candle", on("p2", 0)],
-      ["shelf", grid(8, 0)],
-      ["potion", on("p4")],
+      ["frame", grid(0, 0)],
+      ["rug", grid(4, 2)],
     ]);
-    // Likes: rug, candle (+30). Neutral: table, shelf. Dislike: potion on shelf (-20).
-    expect(reviewRoom(catalog, s, prefs).score).toBe(10);
-  });
-
-  it("stays between 0 and 100", () => {
-    const s = build([
-      ["shelf", grid(0, 0)],
-      ["potion", on("p1")],
-    ]);
-    expect(reviewRoom(catalog, s, prefs).score).toBe(0);
-    const generous: CatPrefs = { ...prefs, points: { liked: 500, disliked: -20 } };
-    expect(reviewRoom(catalog, build([["rug", grid(0, 0)]]), generous).score).toBe(100);
+    expect(pickIdle(catalog, s, room, behavior, scripted(0.1, 0))).toEqual({ kind: "visit", uid: "p2", reaction: "nap" });
+    expect(pickIdle(catalog, s, room, behavior, scripted(0.9, 0, 0, 0)).kind).toBe("wander");
   });
 });
 
-describe("visitOrder", () => {
-  it("walks left to right, floor before wall, rugs first", () => {
-    const s = build([
-      ["frame", grid(0, 0)], // p1, x 0.5, wall
-      ["rug", grid(0, 2)], // p2, x 1, rug
-      ["table", grid(0, 1)], // p3, x 1, floor
-      ["candle", on("p3", 1)], // p4, x 1.5, low surface
-      ["shelf", grid(5, 1)], // p5, x 5.5, wall
-      ["potion", on("p5")], // p6, x 5.5, high surface
+describe("changedItems", () => {
+  it("finds new, moved, and swapped items", () => {
+    const before = build([
+      ["table", grid(0, 0)], // p1
+      ["cauldron", grid(5, 0)], // p2
+      ["frame", grid(0, 0)], // p3
     ]);
-    expect(visitOrder(catalog, s).map((p) => p.itemId)).toEqual(["frame", "rug", "table", "candle", "shelf", "potion"]);
-  });
-});
+    expect(changedItems(before, before)).toEqual([]);
 
-describe("applyKnockovers", () => {
-  it("sends disliked items back to the tray and keeps the rest", () => {
-    const s = build([
-      ["shelf", grid(0, 0)],
-      ["potion", on("p1")],
-      ["rug", grid(0, 2)],
+    const placed = placeFromTray(room, catalog, before, "rug", grid(8, 2))!;
+    expect(changedItems(before, placed)).toEqual(["p4"]);
+
+    const moved = moveItem(room, catalog, before, "p3", grid(4, 1))!;
+    expect(changedItems(before, moved)).toEqual(["p3"]);
+
+    const swapped = moveItem(room, catalog, before, "p2", grid(0, 0))!;
+    expect(changedItems(before, swapped)).toEqual(["p1", "p2"]);
+  });
+
+  it("does not count items that ride along on moved furniture", () => {
+    const before = build([
+      ["table", grid(0, 0)],
+      ["candle", on("p1")],
     ]);
-    const after = applyKnockovers(s, reviewRoom(catalog, s, prefs));
-    expect(after.placements.map((p) => p.itemId)).toEqual(["shelf", "rug"]);
-    expect(after.inventory.potion).toBe(3);
-  });
-});
-
-describe("heartsFor", () => {
-  it("rounds to half hearts out of 5", () => {
-    expect([0, 10, 24, 25, 70, 100].map(heartsFor)).toEqual([0, 0.5, 1, 1.5, 3.5, 5]);
+    const moved = moveItem(room, catalog, before, "p1", grid(6, 2))!;
+    expect(changedItems(before, moved)).toEqual(["p1"]);
   });
 });

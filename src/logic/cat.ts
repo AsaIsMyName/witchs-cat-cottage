@@ -1,7 +1,8 @@
-// The cat's review of a room: which items it visits, in what order, how it reacts, and the
-// happiness score. Plain TypeScript, no Phaser, so it can be unit tested.
+// The ambient cat's decisions: how it reacts to an item, what it does when idle, and which items
+// are new enough to go look at. Plain TypeScript, no Phaser, so it can be unit tested.
+// The cat never judges: every reaction is positive, playful, or curious.
 
-import { removeToTray, type Catalog, type ItemShape, type Placement, type RoomState } from "./grid";
+import { targetOf, type ItemShape, type Placement, type RoomShape, type RoomState } from "./grid";
 
 export interface TaggedItem extends ItemShape {
   tags: string[];
@@ -12,87 +13,74 @@ export type TaggedCatalog = Record<string, TaggedItem>;
 /** Where an item sits: its grid layer, or "low"/"high" for surface items on furniture/shelves. */
 export type Spot = "wall" | "floor" | "rug" | "low" | "high";
 
-export interface DislikeRule {
-  tag: string;
-  /** Only disliked in these spots. Omit for "anywhere". */
-  on?: Spot[];
-}
+export type Reaction = "nap" | "paw-up" | "warm" | "bat" | "loaf" | "stare" | "sniff";
 
-export interface CatPrefs {
-  likes: string[];
-  dislikes: DislikeRule[];
-  points: { liked: number; disliked: number };
-}
-
-export type Reaction = "like" | "neutral" | "dislike";
-
-export interface Visit {
-  uid: string;
-  itemId: string;
+/** A rule matches when every condition it sets holds. The first matching rule picks the reaction. */
+export interface ReactionRule {
   reaction: Reaction;
-  /** The tag behind a like or dislike, for hint text. */
-  tag?: string;
+  /** The item has at least one of these tags. */
+  tags?: string[];
+  /** The item sits in one of these spots. */
+  on?: Spot[];
+  /** The item has (or lacks) a surface. */
+  hasSurface?: boolean;
 }
 
-export interface Review {
-  visits: Visit[];
-  /** Cat happiness, 0–100. */
-  score: number;
+export interface CatBehavior {
+  rules: ReactionRule[];
+  /** Reactions that make an item a cozy spot the cat drifts back to when idle. */
+  cozyReactions: Reaction[];
+  /** Chance (0–1) that an idle cat visits a cozy spot instead of wandering, when there is one. */
+  cozyChance: number;
 }
 
-export const MAX_SCORE = 100;
+export type IdleAction = "sit" | "groom" | "nap";
 
-export function reviewRoom(catalog: TaggedCatalog, state: RoomState, prefs: CatPrefs): Review {
-  const visits = visitOrder(catalog, state).map((p): Visit => {
-    const item = catalog[p.itemId];
-    const spot = spotOf(state, p);
-    const dislike = prefs.dislikes.find((rule) => item.tags.includes(rule.tag) && (!rule.on || rule.on.includes(spot)));
-    if (dislike) return { uid: p.uid, itemId: p.itemId, reaction: "dislike", tag: dislike.tag };
-    const liked = item.tags.find((tag) => prefs.likes.includes(tag));
-    if (liked) return { uid: p.uid, itemId: p.itemId, reaction: "like", tag: liked };
-    return { uid: p.uid, itemId: p.itemId, reaction: "neutral" };
-  });
+export type IdlePlan =
+  | { kind: "visit"; uid: string; reaction: Reaction }
+  | { kind: "wander"; col: number; row: number; action: IdleAction };
 
-  let score = 0;
-  for (const visit of visits) {
-    if (visit.reaction === "like") score += prefs.points.liked;
-    if (visit.reaction === "dislike") score += prefs.points.disliked;
+const IDLE_ACTIONS: IdleAction[] = ["sit", "groom", "nap"];
+
+export function reactionFor(catalog: TaggedCatalog, state: RoomState, p: Placement, rules: ReactionRule[]): Reaction {
+  const item = catalog[p.itemId];
+  if (!item) return "sniff";
+  const spot = spotOf(state, p);
+  const rule = rules.find(
+    (r) =>
+      (!r.tags || r.tags.some((tag) => item.tags.includes(tag))) &&
+      (!r.on || r.on.includes(spot)) &&
+      (r.hasSurface === undefined || Boolean(item.hasSurface) === r.hasSurface),
+  );
+  return rule?.reaction ?? "sniff";
+}
+
+/** What an idle cat does next. `random` returns numbers in [0, 1), like Math.random. */
+export function pickIdle(
+  catalog: TaggedCatalog,
+  state: RoomState,
+  room: RoomShape,
+  behavior: CatBehavior,
+  random: () => number,
+): IdlePlan {
+  const cozy = state.placements
+    .map((p) => ({ uid: p.uid, reaction: reactionFor(catalog, state, p, behavior.rules) }))
+    .filter((c) => behavior.cozyReactions.includes(c.reaction));
+  if (cozy.length > 0 && random() < behavior.cozyChance) {
+    return { kind: "visit", ...cozy[Math.floor(random() * cozy.length)] };
   }
-  return { visits, score: Math.max(0, Math.min(MAX_SCORE, score)) };
-}
-
-/** Sends every knocked-over item (and anything sitting on it) back to the tray. */
-export function applyKnockovers(state: RoomState, review: Review): RoomState {
-  return review.visits
-    .filter((visit) => visit.reaction === "dislike")
-    .reduce((next, visit) => removeToTray(next, visit.uid), state);
-}
-
-/** Hearts out of 5, in half-heart steps. */
-export function heartsFor(score: number): number {
-  return Math.round(score / 10) / 2;
-}
-
-/**
- * The cat walks left to right. Items are visited by the x of their center; at the same x it
- * checks the floor first and looks up last.
- */
-export function visitOrder(catalog: Catalog, state: RoomState): Placement[] {
-  const byUid = new Map(state.placements.map((p) => [p.uid, p]));
-  const position = (p: Placement): { x: number; rank: number } => {
-    if (p.layer !== "surface") {
-      const rank = { rug: 0, floor: 1, wall: 3 }[p.layer];
-      return { x: p.col + catalog[p.itemId].width / 2, rank };
-    }
-    const host = byUid.get(p.hostUid);
-    if (!host || host.layer === "surface") return { x: Infinity, rank: 0 };
-    return { x: host.col + p.slot + 0.5, rank: host.layer === "wall" ? 4 : 2 };
+  return {
+    kind: "wander",
+    col: Math.floor(random() * room.columns),
+    row: Math.floor(random() * room.floorRows),
+    action: IDLE_ACTIONS[Math.floor(random() * IDLE_ACTIONS.length)],
   };
-  return [...state.placements].sort((a, b) => {
-    const pa = position(a);
-    const pb = position(b);
-    return pa.x - pb.x || pa.rank - pb.rank;
-  });
+}
+
+/** Uids of items that are new in `next` or sit somewhere different than in `prev`. */
+export function changedItems(prev: RoomState, next: RoomState): string[] {
+  const before = new Map(prev.placements.map((p) => [p.uid, JSON.stringify(targetOf(p))]));
+  return next.placements.filter((p) => before.get(p.uid) !== JSON.stringify(targetOf(p))).map((p) => p.uid);
 }
 
 export function spotOf(state: RoomState, p: Placement): Spot {
