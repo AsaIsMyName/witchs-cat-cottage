@@ -103,15 +103,20 @@ export class CatActor {
     for (const uid of changedItems(prev, next)) if (!this.queue.includes(uid)) this.queue.push(uid);
 
     const target = this.visiting;
-    if (!target || !displaced(prev, next, target)) return;
-    const reordered = toBack(this.queue, target, next.placements.some((p) => p.uid === target));
-    this.queue.splice(0, this.queue.length, ...reordered);
-    this.current = undefined; // already requeued, so interrupt() mustn't put it back at the front
+    const visitEnded = target !== undefined && displaced(prev, next, target);
+    if (visitEnded) {
+      const reordered = toBack(this.queue, target, next.placements.some((p) => p.uid === target));
+      this.queue.splice(0, this.queue.length, ...reordered);
+      this.current = undefined; // already requeued, so interrupt() mustn't put it back at the front
+    }
 
+    // The cat stays on its perch after a loaf ends, until its next walk, so check this even between visits.
     if (this.perch && movedOrRemoved(prev, next, this.perch.uid)) {
       this.interrupt();
       this.mode = "idle";
       this.hopDown(() => this.later(between(CAT_TIMING.noticeDelay), () => this.next()));
+    } else if (!visitEnded) {
+      return;
     } else if (this.napRug && movedOrRemoved(prev, next, this.napRug)) {
       const rug = this.getViews().get(this.napRug);
       this.interrupt();
