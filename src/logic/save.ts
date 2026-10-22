@@ -5,7 +5,8 @@
 
 import type { Placement, RoomState } from "./grid";
 
-export const SAVE_VERSION = 1;
+// v2: rugs moved to their own layer and the starting tray changed.
+export const SAVE_VERSION = 2;
 
 export interface SaveData {
   version: typeof SAVE_VERSION;
@@ -65,7 +66,11 @@ function isRecord(x: unknown): x is Record<string, unknown> {
 function isPlacement(x: unknown): x is Placement {
   if (!isRecord(x) || typeof x.uid !== "string" || typeof x.itemId !== "string") return false;
   if (x.layer === "surface") return typeof x.hostUid === "string" && typeof x.slot === "number";
-  return (x.layer === "wall" || x.layer === "floor") && typeof x.col === "number" && typeof x.row === "number";
+  return (
+    (x.layer === "wall" || x.layer === "floor" || x.layer === "rug") &&
+    typeof x.col === "number" &&
+    typeof x.row === "number"
+  );
 }
 
 function isRoomState(x: unknown): x is RoomState {

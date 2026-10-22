@@ -1,9 +1,11 @@
 // Room grid placement rules. Plain TypeScript, no Phaser, so it can be unit tested.
 //
-// Wall and floor are separate grids with their own rows. Surface items have no grid
-// position; they sit in a slot on top of a floor item that has a surface.
+// Wall, floor, and rug are separate grids, so items only block items on the same layer.
+// Rugs share the floor's rows and sit under furniture. Surface items have no grid
+// position; they sit in a slot on top of a wall or floor item that has a surface.
 
-export type Layer = "wall" | "floor" | "surface";
+export type Layer = "wall" | "floor" | "rug" | "surface";
+export type GridLayer = Exclude<Layer, "surface">;
 
 export interface ItemShape {
   id: string;
@@ -11,7 +13,7 @@ export interface ItemShape {
   /** Footprint in tiles. Surface items are always 1×1. */
   width: number;
   height: number;
-  /** Floor items only: has a top with one surface slot per tile of width. */
+  /** Wall and floor items only: has a top with one surface slot per tile of width. */
   hasSurface?: boolean;
 }
 
@@ -26,7 +28,7 @@ export type Catalog = Record<string, ItemShape>;
 export interface GridPlacement {
   uid: string;
   itemId: string;
-  layer: "wall" | "floor";
+  layer: GridLayer;
   col: number;
   row: number;
 }
@@ -72,7 +74,7 @@ export function canPlace(
   if (item.layer === "surface") {
     if (target.kind !== "surface") return false;
     const host = state.placements.find((p) => p.uid === target.hostUid);
-    if (!host || host.uid === ignoreUid || host.layer !== "floor") return false;
+    if (!host || host.uid === ignoreUid || host.layer === "surface") return false;
     const hostItem = catalog[host.itemId];
     if (!hostItem?.hasSurface) return false;
     if (!Number.isInteger(target.slot) || target.slot < 0 || target.slot >= hostItem.width) return false;
@@ -136,6 +138,13 @@ export function removeToTray(state: RoomState, uid: string): RoomState {
   return { ...state, placements: state.placements.filter((p) => !removed.includes(p)), inventory };
 }
 
+/** Put everything in the room back in the tray. */
+export function clearRoom(state: RoomState): RoomState {
+  const inventory = { ...state.inventory };
+  for (const p of state.placements) inventory[p.itemId] = (inventory[p.itemId] ?? 0) + 1;
+  return { ...state, placements: [], inventory };
+}
+
 export function surfaceItemsOn(state: RoomState, hostUid: string): SurfacePlacement[] {
   return state.placements.filter((p): p is SurfacePlacement => p.layer === "surface" && p.hostUid === hostUid);
 }
@@ -165,5 +174,5 @@ export function targetOf(p: Placement): Target {
 
 function toPlacement(uid: string, itemId: string, layer: Layer, target: Target): Placement {
   if (target.kind === "surface") return { uid, itemId, layer: "surface", hostUid: target.hostUid, slot: target.slot };
-  return { uid, itemId, layer: layer as "wall" | "floor", col: target.col, row: target.row };
+  return { uid, itemId, layer: layer as GridLayer, col: target.col, row: target.row };
 }

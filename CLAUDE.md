@@ -48,9 +48,10 @@ Decorating is the core of the game, so it gets built and playtested first (see M
 
 - **Grid (front-facing view):** each room is 12 columns wide, with 3 rows of wall slots above 3 rows of floor (back to front). Items in front rows draw on top of items behind them.
 - **Footprints:** floor items take 1×1, 2×1, or 2×2 tiles. Wall items are always 1×1, since multi-tile wall art is out of v1.
-- **Layers:** floor (rugs, chairs, cauldron), wall (frames, shelves, moon charts), and surface (candles, potions, plants placed on top of furniture).
+- **Layers:** rug (floor coverings), floor (chairs, tables, cauldron), wall (frames, shelves, moon charts), and surface (candles, potions, plants placed on top of furniture or shelves).
+- **Rug rules:** rugs share the floor's rows but sit under furniture. A rug can't overlap another rug, but furniture can stand on it. Moving a rug slides it out alone; furniture on it stays put. A rug that's fully covered can't be grabbed until what's on it is moved.
 - **Surface rules:**
-  - Some floor furniture has a top with one surface slot per tile of width (a 2×1 table has 2 slots). Rugs and the cauldron have no top, and wall items (including shelves) have no surface in v1.
+  - Some furniture has a top with one surface slot per tile of width (a 2×1 table has 2 slots). Shelves are 1×1 wall items with 1 slot. Rugs, the cauldron, and other wall items have no top.
   - Surface items (candles, potions, plants) take one slot and can only sit on a surface.
   - Moving furniture moves whatever sits on it. Removing furniture sends whatever sits on it back to the tray.
   - Dropping an item where it doesn't fit snaps it back to where it came from; the drop highlight shows red while hovering there.

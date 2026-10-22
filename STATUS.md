@@ -1,6 +1,22 @@
 # Status
 
-## Oct 21, 2026 — Milestone 1: Decorate sandbox (built, awaiting playtest)
+## Oct 21, 2026 — Milestone 1 follow-up: finer control (awaiting playtest)
+
+Milestone 1 playtest: **go.** Arranging is satisfying; Asa asked for finer control.
+
+**Done**
+- Rugs are their own layer under furniture: furniture can stand on rugs; rugs can't overlap each other; moving a rug leaves furniture in place.
+- Shelves have a 1-slot top for candles and potions, and carry them when moved.
+- Starting tray: 2 shelves, 2 candles, 2 potions, 1 of everything else.
+- "reset room" button in the tray (tap twice to confirm) returns everything to the tray.
+- Save format bumped to v2, so existing saves start fresh once.
+- 54 unit tests pass.
+
+**Next**
+- Asa playtests rugs, shelves, and reset on a phone.
+- Then milestone 2: cat reactor.
+
+## Oct 21, 2026 — Milestone 1: Decorate sandbox
 
 **Done**
 - Front-facing bedroom: 12 columns, 3 wall rows above 3 floor rows, with an item tray below.
@@ -10,18 +26,10 @@
 - Local save (versioned). A broken or old save starts the room fresh.
 - Grid, surface, and save logic in `src/logic/` with 48 unit tests; the game-wide checks pass.
 
-**Not verified**
-- Dragging has not been tried in a real browser yet: automated browser testing didn't work on this machine. The page loads and draws correctly. Asa's phone playtest is the first real drag test.
-
-**Known limits (possible playtest feedback)**
-- Rugs block furniture: a rug is a floor item, so nothing can stand on it.
+**Known limits**
 - The tray doesn't scroll; it fits the 10 starter items only.
 - On a phone in portrait the game is small; landscape is the intended view.
-- No "reset room" button. To start over, drag everything back to the tray.
-
-**Next**
-- Asa playtests on a phone. Go/no-go question: *is arranging things satisfying on its own?*
-- Fix whatever the playtest turns up, then milestone 2 (cat reactor).
+- Automated browser testing doesn't work on this machine; drag behavior is verified by Asa's phone playtests.
 
 ## Oct 21, 2026 — Milestone 0: Setup
 

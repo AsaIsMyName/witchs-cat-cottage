@@ -3,12 +3,14 @@ import { CATALOG, ITEMS, STARTING_INVENTORY, type ItemDef } from "../data/items"
 import { BEDROOM, ROOMS } from "../data/rooms";
 import {
   canPlace,
+  clearRoom,
   emptyRoom,
   isValidState,
   moveItem,
   placeFromTray,
   removeToTray,
   surfaceItemsOn,
+  type GridLayer,
   type GridPlacement,
   type RoomState,
   type Target,
@@ -30,6 +32,7 @@ const SURFACE_ITEM_W = 24;
 const SURFACE_ITEM_H = 22;
 
 const DEPTH_WALL = 10;
+const DEPTH_RUG = 50;
 const DEPTH_FLOOR = 100;
 const DEPTH_DRAGGING = 1000;
 
@@ -40,6 +43,9 @@ const COLOR_GRID_LINE = 0xffffff;
 const COLOR_OUTLINE = 0x1e1a2b;
 const COLOR_OK = 0x7bd389;
 const COLOR_BLOCKED = 0xe0625a;
+const TEXT_MUTED = "#a89cc8";
+const TEXT_WARNING = "#e0625a";
+const RESET_CONFIRM_MS = 3000;
 
 const SAVE_KEY = "witchs-cat-cottage/save";
 
@@ -57,12 +63,12 @@ function visualBox(def: ItemDef): Box {
   if (def.layer === "surface") return { x: 0, y: 0, w: SURFACE_ITEM_W, h: SURFACE_ITEM_H };
   const w = def.width * TILE;
   const h = def.height * TILE;
-  if (def.layer === "wall") return { x: 3, y: 3, w: w - 6, h: h - 6 };
+  if (def.layer === "wall" && def.visualHeight === undefined) return { x: 3, y: 3, w: w - 6, h: h - 6 };
   const visibleH = Math.round(h * (def.visualHeight ?? 0.9));
   return { x: 3, y: h - visibleH, w: w - 6, h: visibleH };
 }
 
-function gridToWorld(p: { layer: "wall" | "floor"; col: number; row: number }): { x: number; y: number } {
+function gridToWorld(p: { layer: GridLayer; col: number; row: number }): { x: number; y: number } {
   return { x: ROOM_X + p.col * TILE, y: (p.layer === "wall" ? WALL_Y : FLOOR_Y) + p.row * TILE };
 }
 
@@ -145,6 +151,8 @@ export class DecorateScene extends Phaser.Scene {
   private readonly sources = new Map<Phaser.GameObjects.GameObject, { view: ItemView; source: DragSource }>();
   private trayLabels: Phaser.GameObjects.Text[] = [];
   private highlight!: Phaser.GameObjects.Graphics;
+  private resetButton!: Phaser.GameObjects.Text;
+  private resetConfirmTimer?: Phaser.Time.TimerEvent;
   private drag?: Drag;
 
   constructor() {
@@ -159,7 +167,41 @@ export class DecorateScene extends Phaser.Scene {
     this.input.on("dragstart", this.onDragStart, this);
     this.input.on("drag", this.onDrag, this);
     this.input.on("dragend", this.onDragEnd, this);
+    this.addResetButton();
     this.renderItems();
+  }
+
+  private addResetButton(): void {
+    this.resetButton = this.add
+      .text(GAME_WIDTH - 10, TRAY_Y + 4, "reset room", {
+        fontFamily: "monospace",
+        fontSize: "10px",
+        color: TEXT_MUTED,
+        resolution: 2,
+      })
+      .setOrigin(1, 0)
+      .setPadding(6, 4, 6, 4)
+      .setInteractive({ useHandCursor: true });
+    this.resetButton.on("pointerup", this.onResetTap, this);
+  }
+
+  /** The first tap asks for confirmation; a second tap within a few seconds clears the room. */
+  private onResetTap(): void {
+    if (!this.resetConfirmTimer) {
+      this.resetButton.setText("tap again to reset").setColor(TEXT_WARNING);
+      this.resetConfirmTimer = this.time.delayedCall(RESET_CONFIRM_MS, this.cancelReset, [], this);
+      return;
+    }
+    this.cancelReset();
+    this.state = clearRoom(this.state);
+    this.saveRoom();
+    this.renderItems();
+  }
+
+  private cancelReset(): void {
+    this.resetConfirmTimer?.remove();
+    this.resetConfirmTimer = undefined;
+    this.resetButton.setText("reset room").setColor(TEXT_MUTED);
   }
 
   private drawRoom(): void {
@@ -216,7 +258,7 @@ export class DecorateScene extends Phaser.Scene {
             .text(x + view.trayWidth / 2, TRAY_ITEM_BOTTOM + 6, `×${count}`, {
               fontFamily: "monospace",
               fontSize: "10px",
-              color: "#a89cc8",
+              color: TEXT_MUTED,
               resolution: 2,
             })
             .setOrigin(0.5, 0),
@@ -236,8 +278,9 @@ export class DecorateScene extends Phaser.Scene {
   }
 
   private depthOf(p: GridPlacement): number {
-    // Floor items closer to the front (higher row) draw on top.
+    // Rugs always draw under furniture. Floor items closer to the front (higher row) draw on top.
     if (p.layer === "wall") return DEPTH_WALL;
+    if (p.layer === "rug") return DEPTH_RUG + p.row;
     return DEPTH_FLOOR + (p.row + CATALOG[p.itemId].height - 1) * 10;
   }
 
@@ -302,17 +345,19 @@ export class DecorateScene extends Phaser.Scene {
   private targetFor(drag: Drag, pointer: Phaser.Input.Pointer): Target | null {
     const def = drag.view.def;
     if (def.layer === "surface") {
-      // The frontmost furniture with a top under the pointer, counting the space just above its top.
-      let best: { uid: string; slot: number; row: number } | null = null;
+      // Of the furniture and shelves under the pointer (counting the space just above their tops),
+      // pick the one whose top is closest, so a shelf just above a table still gets its own drops.
+      let best: { uid: string; slot: number; distance: number } | null = null;
       for (const p of this.state.placements) {
-        if (p.layer !== "floor" || !CATALOG[p.itemId].hasSurface) continue;
+        if (p.layer === "surface" || !CATALOG[p.itemId].hasSurface) continue;
         const host = CATALOG[p.itemId];
         const { x, y } = gridToWorld(p);
         const top = y + visualBox(host).y;
         const inX = pointer.worldX >= x && pointer.worldX < x + host.width * TILE;
         const inY = pointer.worldY >= top - TILE && pointer.worldY < y + host.height * TILE;
-        if (inX && inY && (!best || p.row > best.row)) {
-          best = { uid: p.uid, slot: Math.floor((pointer.worldX - x) / TILE), row: p.row };
+        const distance = Math.abs(pointer.worldY - (top - SURFACE_ITEM_H / 2));
+        if (inX && inY && (!best || distance < best.distance)) {
+          best = { uid: p.uid, slot: Math.floor((pointer.worldX - x) / TILE), distance };
         }
       }
       return best && { kind: "surface", hostUid: best.uid, slot: best.slot };

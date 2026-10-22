@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canPlace,
+  clearRoom,
   emptyRoom,
   isValidState,
   moveItem,
@@ -16,14 +17,15 @@ const room: RoomShape = { columns: 12, wallRows: 3, floorRows: 3 };
 
 const catalog: Catalog = {
   frame: { id: "frame", layer: "wall", width: 1, height: 1 },
+  shelf: { id: "shelf", layer: "wall", width: 1, height: 1, hasSurface: true },
   table: { id: "table", layer: "floor", width: 2, height: 1, hasSurface: true },
-  rug: { id: "rug", layer: "floor", width: 2, height: 1 },
+  rug: { id: "rug", layer: "rug", width: 2, height: 1 },
   bed: { id: "bed", layer: "floor", width: 2, height: 2 },
   candle: { id: "candle", layer: "surface", width: 1, height: 1 },
 };
 
 function start(): RoomState {
-  return emptyRoom({ frame: 2, table: 2, rug: 1, bed: 1, candle: 3 });
+  return emptyRoom({ frame: 2, shelf: 1, table: 2, rug: 1, bed: 1, candle: 3 });
 }
 
 function place(state: RoomState, itemId: string, target: Parameters<typeof placeFromTray>[4]): RoomState {
@@ -107,6 +109,44 @@ describe("surfaces", () => {
   it("keeps surface items off the grid", () => {
     expect(canPlace(room, catalog, start(), "candle", { kind: "grid", col: 0, row: 0 })).toBe(false);
   });
+
+  it("lets a shelf hold one item and carry it when moved", () => {
+    let s = place(start(), "shelf", { kind: "grid", col: 3, row: 1 });
+    s = place(s, "candle", { kind: "surface", hostUid: "p1", slot: 0 });
+    expect(canPlace(room, catalog, s, "candle", { kind: "surface", hostUid: "p1", slot: 1 })).toBe(false);
+    const moved = moveItem(room, catalog, s, "p1", { kind: "grid", col: 7, row: 0 });
+    expect(moved && surfaceItemsOn(moved, "p1")).toHaveLength(1);
+  });
+});
+
+describe("rugs", () => {
+  it("go under furniture", () => {
+    let s = place(start(), "table", { kind: "grid", col: 0, row: 1 });
+    expect(canPlace(room, catalog, s, "rug", { kind: "grid", col: 0, row: 1 })).toBe(true);
+    s = place(s, "rug", { kind: "grid", col: 1, row: 1 });
+    expect(canPlace(room, catalog, s, "bed", { kind: "grid", col: 2, row: 0 })).toBe(true);
+  });
+
+  it("do not overlap other rugs", () => {
+    const twoRugs = emptyRoom({ rug: 2 });
+    const s = place(twoRugs, "rug", { kind: "grid", col: 0, row: 0 });
+    expect(canPlace(room, catalog, s, "rug", { kind: "grid", col: 1, row: 0 })).toBe(false);
+  });
+
+  it("slide out from under furniture without moving it", () => {
+    let s = place(start(), "rug", { kind: "grid", col: 0, row: 2 });
+    s = place(s, "table", { kind: "grid", col: 0, row: 2 });
+    const moved = moveItem(room, catalog, s, "p1", { kind: "grid", col: 6, row: 0 });
+    expect(moved?.placements).toEqual([
+      { uid: "p1", itemId: "rug", layer: "rug", col: 6, row: 0 },
+      { uid: "p2", itemId: "table", layer: "floor", col: 0, row: 2 },
+    ]);
+  });
+
+  it("have no surface", () => {
+    const s = place(start(), "rug", { kind: "grid", col: 0, row: 0 });
+    expect(canPlace(room, catalog, s, "candle", { kind: "surface", hostUid: "p1", slot: 0 })).toBe(false);
+  });
 });
 
 describe("moveItem", () => {
@@ -153,6 +193,17 @@ describe("removeToTray", () => {
   it("ignores unknown uids", () => {
     const s = start();
     expect(removeToTray(s, "nope")).toBe(s);
+  });
+});
+
+describe("clearRoom", () => {
+  it("returns everything to the tray", () => {
+    let s = place(start(), "table", { kind: "grid", col: 0, row: 0 });
+    s = place(s, "candle", { kind: "surface", hostUid: "p1", slot: 0 });
+    s = place(s, "rug", { kind: "grid", col: 0, row: 0 });
+    s = clearRoom(s);
+    expect(s.placements).toEqual([]);
+    expect(s.inventory).toEqual(start().inventory);
   });
 });
 
