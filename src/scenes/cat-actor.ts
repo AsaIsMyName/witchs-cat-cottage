@@ -347,29 +347,40 @@ export class CatActor {
    * Walks to `point` along a floor-tile route (src/logic/route.ts): around furniture, over furniture
    * with a top only when there's no way around, never through anything else. `perchOn` is the
    * furniture `point` sits on top of (a loaf); the route then ends up there. A spot it can't reach
-   * gets the nearest tile it can.
+   * gets the nearest tile it can. Starting on a perch, the route starts up there, so the cat walks to
+   * the edge it's heading for and hops off it.
    */
   private walkTo(point: Point, then: () => void, perchOn?: string): void {
     this.bubble.setVisible(false);
     const host = perchOn !== undefined ? this.getViews().get(perchOn) : undefined;
-    const goal = tileAt(point.x, host ? footprintBottom(host) - 4 : point.y);
-    const go = () => {
-      this.pose = "walking";
-      this.walkRoute(point, goal, host !== undefined, then);
-    };
-    if (this.perch) this.hopDown(go);
-    else go();
+    // A perch goal is the item's tile nearest the cat, so it hops onto the near edge and walks to the spot.
+    const goal = host ? nearestTileOf(host, this.cat.x) : tileAt(point.x, point.y);
+    if (this.perch) {
+      this.perch = { ...this.perch, crossing: true };
+      this.restY = this.perch.groundY;
+    }
+    this.pose = "walking";
+    this.walkRoute(point, goal, host !== undefined, then);
   }
 
   /** Plans a route from where the cat is and walks its legs in turn, re-planning if the room changed meanwhile. */
   private walkRoute(point: Point, goal: Tile, endOnTop: boolean, then: () => void): void {
     const state = this.getState();
-    const onTop = this.perch !== undefined;
+    const perch = this.perch?.uid;
     const from = tileAt(this.cat.x, this.perch?.groundY ?? this.cat.y);
-    const route = findRoute(BEDROOM, CATALOG, state, from, goal, { climbCost: CAT_TIMING.climbCost, onTop, endOnTop });
+    const { climbCost, frontBackHopCost } = CAT_TIMING;
+    const route = findRoute(BEDROOM, CATALOG, state, from, goal, { climbCost, frontBackHopCost, onTop: perch !== undefined, endOnTop });
     const atGoal = route.reached.col === goal.col && route.reached.row === goal.row;
     // Already on the goal tile: just the last few pixels to the exact spot.
-    const legs: Leg[] = route.legs.length === 0 && atGoal && !onTop ? [{ ...goal, climb: false }] : route.legs;
+    const legs: Leg[] = route.legs.length === 0 && atGoal && perch === undefined ? [{ ...goal, climb: false }] : [...route.legs];
+    // About to hop off from somewhere between tiles (e.g. a loaf in the middle of a table): walk to the edge tile first.
+    if (perch !== undefined && legs.length > 0 && legs[0].on !== perch && Math.abs(this.cat.x - floorPoint(from.col, from.row).x) >= 2) {
+      legs.unshift({ ...from, climb: true, on: perch });
+    }
+    // Ending with a hop onto furniture: hop onto the tile, then walk across the top to the exact spot.
+    const last = legs.at(-1);
+    const beforeLast = legs.length >= 2 ? legs[legs.length - 2].on : perch;
+    if (atGoal && last?.climb && last.on !== beforeLast) legs.push({ ...last });
     const step = (i: number) => {
       if (i >= legs.length) return this.arrive(then);
       if (this.getState() !== state) return this.walkRoute(point, goal, endOnTop, then);
@@ -380,7 +391,7 @@ export class CatActor {
 
   /**
    * One straight leg of a route, ending at `exact` if given (the walk's final point), else at the
-   * leg's tile. Hops on and off furniture are quick; on top it walks a little slower.
+   * leg's tile. Hops on and off furniture are short arcs; on top it walks a little slower.
    */
   private walkLeg(leg: Leg, exact: Point | undefined, then: () => void): void {
     const host = leg.on !== undefined ? this.getViews().get(leg.on) : undefined;
@@ -388,9 +399,10 @@ export class CatActor {
     const distance = Phaser.Math.Distance.Between(this.cat.x, this.cat.y, target.x, target.y);
     if (distance < 2) return then();
     this.turnTo(target.x);
-    const move = (speed: number | undefined, ease: string, trackDepth: boolean) => {
-      const duration = speed === undefined ? CAT_TIMING.hop : Math.max(150, (distance / speed) * 1000);
-      this.startMove({ targets: this.cat, x: target.x, y: target.y, duration, ease }, then, trackDepth);
+    /** `speed` in px per second; none means a hop. */
+    const move = (speed: number | undefined, trackDepth: boolean) => {
+      if (speed === undefined) return this.startMove(target, CAT_TIMING.hop, then, { arc: CAT_TIMING.hopArc });
+      this.startMove(target, Math.max(150, (distance / speed) * 1000), then, { trackDepth });
     };
 
     if (leg.climb && host && leg.on !== undefined) {
@@ -400,15 +412,15 @@ export class CatActor {
       this.perch = { uid: leg.on, groundY, crossing: true };
       this.restY = groundY;
       this.updateDepth();
-      move(hop ? undefined : CAT_TIMING.topWalkSpeed, hop ? "Quad.easeOut" : "Linear", false);
+      move(hop ? undefined : CAT_TIMING.topWalkSpeed, false);
     } else if (this.perch) {
-      // Hopping down: stays drawn above the furniture until it lands.
+      // Hopping off the edge onto the next floor tile: stays drawn above the furniture until it lands.
       this.perch = undefined;
       this.restY = target.y;
-      move(undefined, "Quad.easeIn", false);
+      move(undefined, false);
     } else {
       this.restY = undefined;
-      move(CAT_TIMING.walkSpeed, "Linear", true);
+      move(CAT_TIMING.walkSpeed, true);
     }
   }
 
@@ -421,28 +433,38 @@ export class CatActor {
     then();
   }
 
+  /** Hops straight down off its perch, unbothered: only for a perch that was moved or removed. */
   private hopDown(then: () => void, groundY = this.perch?.groundY ?? this.cat.y): void {
     this.perch = undefined;
-    this.pose = "walking";
-    this.restY = groundY;
-    this.startMove({ targets: this.cat, y: groundY, duration: 250, ease: "Quad.easeIn" }, () => {
+    const landed = () => {
       this.restY = undefined;
       this.pose = "resting";
       this.updateDepth();
       then();
-    });
+    };
+    if (Math.abs(groundY - this.cat.y) < 2) return landed(); // already dropped to the floor by an interrupt
+    this.pose = "walking";
+    this.restY = groundY;
+    this.startMove({ x: this.cat.x, y: groundY }, CAT_TIMING.hopDown, landed, { arc: CAT_TIMING.hopArc });
   }
 
   /**
-   * A movement tween: petting can slow it down, and the speech bubble rides along. With
-   * `trackDepth`, the cat's depth follows its y every frame, so it passes behind front-row items.
+   * Moves the cat to `to` over `duration`: petting can slow it down, and the speech bubble rides
+   * along. `arc` lifts it that many px mid-move, for a hop. With `trackDepth`, its depth follows
+   * its y every frame, so it passes behind front-row items.
    */
-  private startMove(config: Phaser.Types.Tweens.TweenBuilderConfig, then: () => void, trackDepth = false): void {
+  private startMove(to: Point, duration: number, then: () => void, opts: { arc?: number; trackDepth?: boolean } = {}): void {
+    const from = { x: this.cat.x, y: this.cat.y };
+    const arc = opts.arc ?? 0;
+    const progress = { t: 0 };
     const onUpdate = () => {
-      if (trackDepth) this.updateDepth();
+      const t = progress.t;
+      const lift = 4 * t * (1 - t) * arc;
+      this.cat.setPosition(Phaser.Math.Linear(from.x, to.x, t), Phaser.Math.Linear(from.y, to.y, t) - lift);
+      if (opts.trackDepth) this.updateDepth();
       this.followBubble();
     };
-    this.move = this.tween({ ...config, onUpdate }, () => {
+    this.move = this.tween({ targets: progress, t: 1, duration, ease: "Linear", onUpdate }, () => {
       this.move = undefined;
       then();
     });
@@ -486,6 +508,7 @@ export class CatActor {
   private interrupt(): void {
     this.token++;
     this.scene.tweens.killTweensOf(this.cat);
+    this.move?.remove(); // movement tweens drive a progress counter, not the cat itself
     this.move = undefined;
     this.petEase?.remove();
     this.petEase = undefined;
@@ -638,6 +661,13 @@ function rowAt(y: number): number {
 /** The floor tile under a point (feet at `y`), clamped to the room. */
 function tileAt(x: number, y: number): Tile {
   return { col: Phaser.Math.Clamp(Math.floor((x - ROOM_X) / TILE), 0, BEDROOM.columns - 1), row: rowAt(y) };
+}
+
+/** The tile of a floor item's front row nearest to `x`. */
+function nearestTileOf(view: ItemView, x: number): Tile {
+  const first = Math.round((view.x - ROOM_X) / TILE);
+  const col = Phaser.Math.Clamp(tileAt(x, FLOOR_Y).col, first, first + view.def.width - 1);
+  return { col, row: rowAt(footprintBottom(view) - 4) };
 }
 
 /** Floor depth for a cat standing at `y`: in front of items in its row, behind rows nearer the front. */

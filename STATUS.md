@@ -4,6 +4,28 @@
 
 From the playtest: the cat walked straight (often diagonally) over placed items, and drew on top of things it should pass behind.
 
+**Follow-up (Asa's playtest of e6e9cb4): slower arcing hops, edge climbs, natural dismounts**
+- Hops are slower and arc: a hop on, off, or between tops takes `CAT_TIMING.hop` 400ms (was 300). The straight hop down when a perch is moved or removed takes `hopDown` 350ms (was 250). Both rise `hopArc` 6px above a straight line mid-hop. Movement tweens now drive a progress counter, and `interrupt()` removes the current one.
+- Dismounts: starting a walk while perched no longer drops straight down first. The route starts on top, so the cat walks to the edge it's heading for (from the middle of a table, first to that edge tile's center) and hops off in one arc onto the next floor tile of its route.
+  - The straight "hop down, unbothered" stays only for a moved or removed perch. Interrupts still snap the cat to the floor instantly.
+- Edge climbs: hops always land on the tile next to the one the cat hops from, never mid-table.
+  - A loaf aims for the table tile nearest the cat. The cat hops onto it, then walks across the top to the loaf spot (the table's middle).
+  - A stool is still a single hop up and down.
+- Route costs changed in `route.ts`:
+  - `climbCost` (4) is now paid once per hop up, not per tile, so once up the cat walks across the top instead of hopping off early and doubling back.
+  - New `frontBackHopCost` (0.5) makes it prefer hopping on and off from the side.
+  - Walking around is still preferred over climbing. Going around through the rows behind or in front is unchanged, as is staying drawn in front when climbing over.
+- Six new route tests: edge hop then walk to the loaf spot, side over behind, from the front only when it must, hop off toward the goal not back, walk to the far edge when starting on top, stool single hops.
+- 137 unit tests pass.
+- Re-test:
+  - Do hops read at a comfortable speed, and is the arc visible but subtle?
+  - Loaf on the table from the left, then from the right: does it hop onto the near end and walk to the middle?
+  - From a loaf, send it somewhere on the other side: does it walk to that edge and hop off forward, with no drop and walk back?
+  - Wall it in with tables: does it hop on at one edge, walk across, and hop off the far edge?
+  - Stool: a single hop up and down.
+  - Move the table it's loafing on: still a straight hop down. Move it mid-crossing: still lands on the floor at once.
+  - Petting mid-hop still slows it.
+
 **Done**
 - New pure module `src/logic/route.ts` (`findRoute`), with 17 tests in `route.test.ts`. It plans a route on the 12×3 floor grid:
   - Floor items block their tiles. Rugs and wall items don't.

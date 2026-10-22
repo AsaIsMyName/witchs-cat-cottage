@@ -1,8 +1,9 @@
 // The cat's walking routes on the floor grid. Plain TypeScript, no Phaser, so it can be unit tested.
 //
-// The cat walks on floor tiles (columns × floor rows). Tiles under floor-layer items are blocked;
-// rugs and the wall layer don't touch its path. Furniture with a top (table, stool) can be climbed
-// at an extra cost, so the cat only goes over it when walking around is much longer or impossible.
+// The cat walks on floor tiles (columns Ã— floor rows). Tiles under floor-layer items are blocked;
+// rugs and the wall layer don't touch its path. Furniture with a top (table, stool) can be climbed:
+// each hop up costs extra, so the cat only goes over it when walking around is much longer or
+// impossible. Once up, it walks across the top and hops off the edge on its way.
 
 import type { Catalog, RoomShape, RoomState } from "./grid";
 
@@ -27,8 +28,10 @@ export interface Route {
 }
 
 export interface RouteOptions {
-  /** Extra cost, in steps, of each furniture tile crossed on top. */
+  /** Extra cost, in steps, of each hop up onto furniture (or from one top onto another). */
   climbCost: number;
+  /** Extra cost of a hop on or off from behind or in front, so the cat prefers hopping from the side. */
+  frontBackHopCost?: number;
   /** The cat starts up on the furniture at `from` (mid-route), not on the floor. */
   onTop?: boolean;
   /** The destination is a perch on top of furniture: end up there instead of on the floor nearby. */
@@ -66,7 +69,7 @@ export function findRoute(
     origin = off;
   }
 
-  const { cost, prev } = search(room, cells, origin, options.climbCost);
+  const { cost, prev } = search(room, cells, origin, options.climbCost, options.frontBackHopCost ?? 0);
   const endsHere = (t: Tile) => {
     const kind = cell(t).kind;
     return kind === "free" || (kind === "top" && options.endOnTop === true);
@@ -100,7 +103,7 @@ function floorCells(room: RoomShape, catalog: Catalog, state: RoomState): Cell[]
 }
 
 /** Dijkstra over the floor tiles. 36 tiles, so a plain scan for the cheapest open tile is plenty. */
-function search(room: RoomShape, cells: Cell[][], origin: Tile, climbCost: number) {
+function search(room: RoomShape, cells: Cell[][], origin: Tile, climbCost: number, frontBackHopCost: number) {
   const n = room.columns * room.floorRows;
   const cost = new Array<number>(n).fill(Infinity);
   const prev = new Array<number | undefined>(n).fill(undefined);
@@ -112,7 +115,9 @@ function search(room: RoomShape, cells: Cell[][], origin: Tile, climbCost: numbe
     if (k < 0) break;
     done[k] = true;
     const here = tileOf(room, k);
-    const hereFree = cells[here.row][here.col].kind === "free";
+    const hereCell = cells[here.row][here.col];
+    const hereFree = hereCell.kind === "free";
+    const hereOn = hereCell.kind === "top" ? hereCell.uid : undefined;
     for (let dr = -1; dr <= 1; dr++) {
       for (let dc = -1; dc <= 1; dc++) {
         if (dr === 0 && dc === 0) continue;
@@ -128,7 +133,12 @@ function search(room: RoomShape, cells: Cell[][], origin: Tile, climbCost: numbe
           if (!free({ col: here.col + dc, row: here.row }) || !free({ col: here.col, row: here.row + dr })) continue;
           step = Math.SQRT2;
         }
-        if (target.kind === "top") step += climbCost;
+        // A hop: onto a top, off it, or from one top to another. Hops are never diagonal.
+        const nextOn = target.kind === "top" ? target.uid : undefined;
+        if (nextOn !== hereOn) {
+          if (nextOn !== undefined) step += climbCost;
+          if (dr !== 0) step += frontBackHopCost;
+        }
         const j = key(room, next);
         if (cost[k] + step < cost[j]) {
           cost[j] = cost[k] + step;

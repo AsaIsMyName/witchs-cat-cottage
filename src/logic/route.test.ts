@@ -13,7 +13,7 @@ const catalog: Catalog = {
   candle: { id: "candle", layer: "surface", width: 1, height: 1 },
 };
 
-const options = { climbCost: 4 };
+const options = { climbCost: 4, frontBackHopCost: 0.5 };
 
 /** A room with `items` placed as [itemId, col, row]; uids are p1, p2, … in order. */
 function roomWith(...items: [string, number, number][]): RoomState {
@@ -158,12 +158,66 @@ describe("findRoute", () => {
     expect(route.reached).toEqual({ col: 3, row: 0 });
   });
 
-  it("hops straight down when it starts on top of furniture it doesn't need to cross", () => {
+  it("starting on a table, walks to the edge it's heading for and hops off there", () => {
     const state = roomWith(["table", 3, 1]);
     const route = findRoute(room, catalog, state, { col: 3, row: 1 }, { col: 8, row: 1 }, { ...options, onTop: true });
-    expect(route.legs[0].climb).toBe(false);
-    expect(route.legs.every((leg) => !leg.climb)).toBe(true);
-    expect(route.reached).toEqual({ col: 8, row: 1 });
+    expect(route.legs).toEqual([
+      { col: 4, row: 1, climb: true, on: "p1" },
+      { col: 5, row: 1, climb: false },
+      { col: 8, row: 1, climb: false },
+    ]);
+  });
+
+  it("hops off toward the goal, not back the way it came", () => {
+    const state = roomWith(["table", 5, 1]);
+    const route = findRoute(room, catalog, state, { col: 6, row: 1 }, { col: 1, row: 1 }, { ...options, onTop: true });
+    expect(route.legs).toEqual([
+      { col: 5, row: 1, climb: true, on: "p1" },
+      { col: 4, row: 1, climb: false },
+      { col: 1, row: 1, climb: false },
+    ]);
+  });
+
+  it("hops onto the near edge of a 2×1 table from the side, then walks across to the loaf spot", () => {
+    const state = roomWith(["table", 5, 1]);
+    const route = findRoute(room, catalog, state, { col: 1, row: 1 }, { col: 6, row: 1 }, { ...options, endOnTop: true });
+    expect(route.legs).toEqual([
+      { col: 4, row: 1, climb: false },
+      { col: 5, row: 1, climb: true, on: "p1" },
+      { col: 6, row: 1, climb: true, on: "p1" },
+    ]);
+  });
+
+  it("prefers hopping up from the side over from behind", () => {
+    const state = roomWith(["stool", 5, 1]);
+    const route = findRoute(room, catalog, state, { col: 4, row: 0 }, { col: 5, row: 1 }, { ...options, endOnTop: true });
+    expect(route.legs).toEqual([
+      { col: 4, row: 1, climb: false },
+      { col: 5, row: 1, climb: true, on: "p1" },
+    ]);
+  });
+
+  it("hops up from in front when that's the only way", () => {
+    const state = roomWith(["stool", 5, 2], ["cauldron", 4, 2], ["cauldron", 6, 2]);
+    const route = findRoute(room, catalog, state, { col: 5, row: 0 }, { col: 5, row: 2 }, { ...options, endOnTop: true });
+    expect(route.legs).toEqual([
+      { col: 5, row: 1, climb: false },
+      { col: 5, row: 2, climb: true, on: "p1" },
+    ]);
+  });
+
+  it("gets on and off a stool in single hops", () => {
+    const state = roomWith(["stool", 5, 1]);
+    const up = findRoute(room, catalog, state, { col: 1, row: 1 }, { col: 5, row: 1 }, { ...options, endOnTop: true });
+    expect(up.legs).toEqual([
+      { col: 4, row: 1, climb: false },
+      { col: 5, row: 1, climb: true, on: "p1" },
+    ]);
+    const off = findRoute(room, catalog, state, { col: 5, row: 1 }, { col: 9, row: 1 }, { ...options, onTop: true });
+    expect(off.legs).toEqual([
+      { col: 6, row: 1, climb: false },
+      { col: 9, row: 1, climb: false },
+    ]);
   });
 
   it("carries on across furniture when it starts on top and there's no way around", () => {
