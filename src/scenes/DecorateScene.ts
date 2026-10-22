@@ -12,10 +12,12 @@ import {
   type RoomState,
   type Target,
 } from "../logic/grid";
+import { layoutTrayRow } from "../logic/tray";
 import { CatActor } from "./cat-actor";
 import { openPortal, popIn, sendBack, sparkle } from "./magic-fx";
 import { loadRoom, saveRoom } from "./room-store";
 import {
+  BOOK_PAGES,
   DEPTH_FLOOR,
   FLOOR_Y,
   GAME_HEIGHT,
@@ -25,18 +27,23 @@ import {
   SURFACE_ITEM_H,
   TEXT_MUTED,
   TILE,
+  TRAY_COUNT_GAP,
+  TRAY_HEADING_Y,
+  TRAY_ITEM_BOTTOM,
   TRAY_Y,
   WALL_Y,
   drawRoom,
   gridToWorld,
   layoutPlacements,
+  pageItemArea,
   textStyle,
   visualBox,
   type Box,
 } from "./room-view";
 
-const TRAY_ITEM_BOTTOM = TRAY_Y + 72;
 const TRAY_GAP = 12;
+/** "reset room" has this much padding, so its text lines up with the right page's item area. */
+const RESET_PADDING = 6;
 const DEPTH_DRAGGING = 1000;
 
 const COLOR_OK = 0x7bd389;
@@ -115,10 +122,11 @@ export class DecorateScene extends Phaser.Scene {
   }
 
   private addResetButton(): void {
+    const page = pageItemArea(BOOK_PAGES[1]);
     this.resetButton = this.add
-      .text(GAME_WIDTH - 14, TRAY_Y + 6, "reset room", textStyle(10, TEXT_MUTED))
+      .text(page.x + page.w + RESET_PADDING, TRAY_HEADING_Y - 4, "reset room", textStyle(10, TEXT_MUTED))
       .setOrigin(1, 0)
-      .setPadding(6, 4, 6, 4)
+      .setPadding(RESET_PADDING, 4, RESET_PADDING, 4)
       .setInteractive({ useHandCursor: true });
     this.resetButton.on("pointerup", this.onResetTap, this);
   }
@@ -152,19 +160,21 @@ export class DecorateScene extends Phaser.Scene {
 
     const trayItems = ITEMS.filter((item) => (this.state.inventory[item.id] ?? 0) > 0);
     const trayViews = trayItems.map((item) => this.addView(item, { kind: "tray", itemId: item.id }));
-    const totalW = trayViews.reduce((sum, v) => sum + v.trayWidth, 0) + TRAY_GAP * Math.max(0, trayViews.length - 1);
-    let x = (GAME_WIDTH - totalW) / 2;
-    for (const view of trayViews) {
+    // Left page first, then the right, each row centered on its page.
+    const pages = BOOK_PAGES.map(pageItemArea);
+    const xs = layoutTrayRow(trayViews.map((v) => v.trayWidth), pages, TRAY_GAP);
+    trayViews.forEach((view, i) => {
+      const x = xs[i];
       view.setPosition(x, view.footprintYForBottom(TRAY_ITEM_BOTTOM));
       view.setDepth(DEPTH_FLOOR);
       const count = this.state.inventory[view.def.id] ?? 0;
       if (count > 1) {
+        const countY = TRAY_ITEM_BOTTOM + TRAY_COUNT_GAP;
         this.trayLabels.push(
-          this.add.text(x + view.trayWidth / 2, TRAY_ITEM_BOTTOM + 6, `×${count}`, textStyle(10, TEXT_MUTED)).setOrigin(0.5, 0),
+          this.add.text(x + view.trayWidth / 2, countY, `×${count}`, textStyle(10, TEXT_MUTED)).setOrigin(0.5, 0),
         );
       }
-      x += view.trayWidth + TRAY_GAP;
-    }
+    });
   }
 
   private addView(def: ItemDef, source: DragSource): ItemView {

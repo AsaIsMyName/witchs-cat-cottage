@@ -2,8 +2,24 @@
 
 ## Oct 22, 2026 — Milestone 3a: spellbook inventory and portal effects (awaiting playtest)
 
+**Follow-up (Asa's first look): items now sit on the pages**
+- The first version laid the book's items out as one centered row across the spine. Now they fill the left page, then the right, each row centered inside its page's trim with 8px padding. Order is unchanged, and nothing crosses the spine or a page edge.
+- Page geometry has one source of truth: `BOOK_PAGES`, `pageItemArea`, `TRAY_HEADING_Y`, and `TRAY_ITEM_BOTTOM` in `room-view.ts`. Both the drawing and the item layout read them.
+- The split is a new pure helper, `layoutTrayRow`, in `src/logic/tray.ts` (tested, including today's starting inventory).
+  - If both pages are full, extra items stay on the right page and spill over its edges. Real paging comes in milestone 4.
+  - Items are never scaled.
+- Numbers (`TRAY_Y` 316, unchanged):
+  - Pages are 369×100 at y 323: the left page starts at x 10, the right at x 389. The spine is at 379–389.
+  - Item areas are 347×78 at y 334–412: x 21–368 on the left page, x 400–747 on the right.
+  - Item bottom is 390, so the tallest item's top is at 348, and the ×N counts sit at 396–~408.
+  - The heading's and the reset button's text both start at y 326. The reset button's padded box ends at about 342, and its right edge lines up with the right item area's edge.
+- Today's inventory:
+  - Left page: frame, moon chart, shelf ×2, clock, table (336px wide).
+  - Right page: stool, rug, cauldron, candle ×2, potion ×2 (288px wide).
+- 115 unit tests pass.
+
 **Done**
-- The tray is drawn as an open spellbook: an amber-trimmed cover, two page panels, a dark spine down the middle, and a small "magic inventory" heading. Item layout, `TRAY_Y`, and the drop-to-remove area are unchanged. "reset room" moved a few px (to x −14, y +6) so it sits inside the right page, level with the heading. The green outline when dragging back over the book stays.
+- The tray is drawn as an open spellbook: an amber-trimmed cover, two page panels, a dark spine down the middle, and a small "magic inventory" heading. `TRAY_Y` and the drop-to-remove area are unchanged. The green outline when dragging back over the book stays.
 - Summon: dragging from the book opens a two-ring portal at the item's book spot that fades and shrinks out (~280ms), and the item pops from 0.85 to full size over 120ms.
 - Land: a successful place or move (including swaps and amber replaces) throws six small four-point stars out from the dragged item's final spot (~360ms).
 - Send back: anything that leaves the room spins and shrinks into a small swirl (~360ms): an item dragged to the book, surface items riding on removed furniture, the item an amber replace sends back, and everything on "reset room". The ghost is a separate copy, so it outlives the re-render. It starts where the item's view last was (for a drag to the book, that's where it was dropped).
@@ -16,7 +32,7 @@
 
 **Not verified**
 - Not run in a real browser; `npm run check` can't check visuals or feel. Asa, please re-test locally and on a phone:
-  - Does the book read as a spellbook, and are all item labels, ×N counts, the heading, and "reset room" readable? (The spine runs through the middle of the item row.)
+  - Does the book read as a spellbook? Does each page's row sit clear of the spine and inside the trim? Are all item labels, ×N counts, the heading, and "reset room" readable?
   - Drag from the book: does the item stick to your finger from the first frame, with no lag? Is the portal ring visible behind it?
   - Drop a tray item, move an item, and swap two items: one small sparkle on the dragged item each time?
   - Drag the table (with a candle on it) to the book: do both spin away? Amber replace a candle: does the old one spin away?

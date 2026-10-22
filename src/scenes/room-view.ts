@@ -195,27 +195,58 @@ export function drawRoom(scene: Phaser.Scene): void {
   drawSpellbook(scene, g);
 }
 
+// Spellbook geometry. Drawing the book and laying out its items both read these, so they can't drift apart.
+const BOOK_COVER: Box = { x: 4, y: TRAY_Y + 2, w: GAME_WIDTH - 8, h: GAME_HEIGHT - TRAY_Y - 6 };
+const SPINE_X = GAME_WIDTH / 2;
+const PAGE_TRIM_INSET = 3;
+const PAGE_PADDING = 8;
+
+/** The spellbook's two pages, left then right, either side of the spine. */
+export const BOOK_PAGES: Box[] = (() => {
+  const y = BOOK_COVER.y + 5;
+  const h = BOOK_COVER.h - 10;
+  const left = BOOK_COVER.x + 6;
+  const w = SPINE_X - SPINE_HALF_W - left;
+  return [
+    { x: left, y, w, h },
+    { x: SPINE_X + SPINE_HALF_W, y, w, h },
+  ];
+})();
+
+/** Where items may sit on a page: inside its faint trim line, with padding. */
+export function pageItemArea(page: Box): Box {
+  const inset = PAGE_TRIM_INSET + PAGE_PADDING;
+  return { x: page.x + inset, y: page.y + inset, w: page.w - inset * 2, h: page.h - inset * 2 };
+}
+
+/** The heading and "reset room" share this text top, above the item row. */
+export const TRAY_HEADING_Y = TRAY_Y + 10;
+/** Gap between an item's bottom and its ×N count. */
+export const TRAY_COUNT_GAP = 6;
+/** Room under the items for the count: the gap, one 10px text line, and a little slack. */
+const TRAY_COUNT_SPACE = TRAY_COUNT_GAP + 16;
+/** Visible bottom of every item in the book, leaving room for the counts above the page's padded bottom. */
+export const TRAY_ITEM_BOTTOM = (() => {
+  const area = pageItemArea(BOOK_PAGES[0]);
+  return area.y + area.h - TRAY_COUNT_SPACE;
+})();
+
 /** The inventory, drawn as an open spellbook: a trimmed cover, two pages, and a dark spine. */
 function drawSpellbook(scene: Phaser.Scene, g: Phaser.GameObjects.Graphics): void {
-  const coverX = 4;
-  const coverY = TRAY_Y + 2;
-  const coverW = GAME_WIDTH - 8;
-  const coverH = GAME_HEIGHT - TRAY_Y - 6;
-  g.fillStyle(COLOR_BOOK_COVER).fillRoundedRect(coverX, coverY, coverW, coverH, 6);
-  g.lineStyle(2, COLOR_BOOK_TRIM).strokeRoundedRect(coverX, coverY, coverW, coverH, 6);
+  const cover = BOOK_COVER;
+  g.fillStyle(COLOR_BOOK_COVER).fillRoundedRect(cover.x, cover.y, cover.w, cover.h, 6);
+  g.lineStyle(2, COLOR_BOOK_TRIM).strokeRoundedRect(cover.x, cover.y, cover.w, cover.h, 6);
 
-  const pageY = coverY + 5;
-  const pageH = coverH - 10;
-  const spineX = GAME_WIDTH / 2;
-  const pageW = spineX - SPINE_HALF_W - (coverX + 6);
-  for (const pageX of [coverX + 6, spineX + SPINE_HALF_W]) {
-    g.fillStyle(COLOR_BOOK_PAGE).fillRect(pageX, pageY, pageW, pageH);
-    g.lineStyle(1, COLOR_BOOK_TRIM, 0.45).strokeRect(pageX + 3, pageY + 3, pageW - 6, pageH - 6);
+  const t = PAGE_TRIM_INSET;
+  for (const page of BOOK_PAGES) {
+    g.fillStyle(COLOR_BOOK_PAGE).fillRect(page.x, page.y, page.w, page.h);
+    g.lineStyle(1, COLOR_BOOK_TRIM, 0.45).strokeRect(page.x + t, page.y + t, page.w - t * 2, page.h - t * 2);
   }
-  g.fillStyle(COLOR_BOOK_SPINE).fillRect(spineX - SPINE_HALF_W, coverY, SPINE_HALF_W * 2, coverH);
-  g.lineStyle(1, COLOR_BOOK_TRIM, 0.6).lineBetween(spineX, coverY + 2, spineX, coverY + coverH - 2);
+  g.fillStyle(COLOR_BOOK_SPINE).fillRect(SPINE_X - SPINE_HALF_W, cover.y, SPINE_HALF_W * 2, cover.h);
+  g.lineStyle(1, COLOR_BOOK_TRIM, 0.6).lineBetween(SPINE_X, cover.y + 2, SPINE_X, cover.y + cover.h - 2);
 
-  scene.add.text(coverX + 14, TRAY_Y + 10, "magic inventory", textStyle(10, TEXT_MUTED));
+  const heading = pageItemArea(BOOK_PAGES[0]);
+  scene.add.text(heading.x, TRAY_HEADING_Y, "magic inventory", textStyle(10, TEXT_MUTED));
 }
 
 /**
