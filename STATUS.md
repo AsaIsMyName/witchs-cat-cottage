@@ -1,5 +1,30 @@
 # Status
 
+## Oct 22, 2026 — Direction change: magic theme, decorate above all
+
+Asa redirected the game; CLAUDE.md is rewritten to match. No code changed.
+
+**Decided**
+- Decorating comes first. Cleaning is now one optional way to earn, not a step before decorating.
+- The tray becomes a magic inventory, with portal summon and send-back effects. The cat sometimes tumbles into a portal and floats in the inventory, and may bring a gift.
+- One room, with wallpaper and ground switched separately (about 3 of each in v1). Items aren't locked to themes.
+- Earning comes from magic motes and cat gifts, tuned so new items are never a bottleneck. No incremental clicker.
+- The player names the cat and picks a preset coat.
+- New milestone order:
+  - 3: magic layer
+  - 4: room themes and 25–30 items
+  - 5: earning, shop, scrapbook, optional cleaning
+  - 6: cat customization
+  - 7: art pass
+  - 8: feel pass
+
+**Open (CLAUDE.md)**
+- Are wallpapers and grounds free from the start, or shop unlocks? (milestone 4)
+- What's the currency called? (milestone 5)
+
+**Next**
+- Milestone 3: magic layer. Plan first, for Asa's approval.
+
 ## Oct 22, 2026 — Milestone 2: go. Cat moments scrapbook decided
 
 Ambient-cat playtest: **go.** The cat makes decorating feel cozier. All cat fixes through `c215175` are merged to `main` and deployed.
@@ -17,7 +42,7 @@ Ambient-cat playtest: **go.** The cat makes decorating feel cozier. All cat fixe
 - An interrupted climb snaps the cat straight down instead of back to its row.
 
 **Next**
-- Milestone 3: cleaning phase. Plan first, for Asa's approval.
+- ~~Milestone 3: cleaning phase.~~ Superseded by the direction change above.
 
 ## Oct 22, 2026 — The cat stands on the item's side of the table (awaiting playtest)
 
