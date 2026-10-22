@@ -37,7 +37,9 @@ From the playtest: the cat walked straight (often diagonally) over placed items,
 - Asa playtests the walk.
 - Then back to 3a's playtest and task 3b (the cat's portal moment).
 
-## Oct 22, 2026 — Milestone 3a: spellbook inventory and portal effects (awaiting playtest)
+## Oct 22, 2026 — Milestone 3a: spellbook inventory and portal effects (signed off)
+
+Playtest: **signed off** for now (Oct 22, 2026). The book looks much better after the per-page layout fix. Not merged to `main` yet: Asa wants the pathfinding change playtested and the whole batch since `c215175` reviewed by both reviewer agents first.
 
 **Follow-up (Asa's first look): items now sit on the pages**
 - The first version laid the book's items out as one centered row across the spine. Now they fill the left page, then the right, each row centered inside its page's trim with 8px padding. Order is unchanged, and nothing crosses the spine or a page edge.
