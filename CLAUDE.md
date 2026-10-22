@@ -25,17 +25,18 @@ One room takes about 5–10 minutes: a short clean, then a longer decorate with 
 Decided Oct 21, 2026, after the milestone 2 playtest: a scored cat review made decorating feel like a puzzle with wrong answers, and didn't make Asa want to rearrange. The cat is now an ambient companion that lives in the room while you decorate.
 
 - **Always there:** the cat is in the Decorate scene the whole time. It never blocks drops or gets in the way of dragging.
-- **No score, no wrong answers:** reactions are always positive, playful, or curious. Nothing is knocked off or sent back to the tray.
+- **No score, no wrong answers:** reactions are always positive, playful, or curious. Nothing is knocked off or sent back to the tray. The one exception: sliding a rug out from under a napping cat gets a short, mild, cartoonish grumpy wake-up (puffs up, shakes, "hmph!").
 - **Tags pick reactions:** every decor item has 1–3 tags (cozy, soft, warm, shiny, spooky, fragile, tall, …). Tags choose *which* reaction the cat does, not whether it approves.
 - **Behavior (scripted, no real AI or pathfinding in v1):**
   - Idle: wanders, sits, grooms, or naps, drifting toward cozy spots (e.g. a rug or near the cauldron) when there are some.
   - When an item is placed or moved, the cat finishes what it's doing (including a nap), then strolls over and reacts. Several new items are visited one at a time, at the cat's own pace.
-  - Player actions never interrupt the cat's flow. While the player drags something, an idle cat that's sitting still glances toward it; a walking, napping, or reacting cat carries on.
+  - Player actions never interrupt the cat's flow (except the two cases below). While the player drags something, an idle cat that's sitting still glances toward it; a walking, napping, or reacting cat carries on.
   - Tapping the cat pets it: it purrs, a heart floats up, and it rolls over. A drag that starts on the cat still picks up the item underneath.
   - If the item the cat is sitting on is removed or moved, the cat hops down, unbothered.
+  - If the rug the cat is napping on is moved or removed, it wakes up right away, grumpy, then carries on; it may stroll over to the moved rug later like any other changed item.
 - **Reactions (first match wins; values in `src/data/cat.ts`):**
   - soft (rug): curls up and naps.
-  - shiny or fragile on a shelf: reaches up and paws at it; the item wobbles but stays put.
+  - shiny or fragile on a shelf or the wall: reaches up and paws at it; the item wobbles but stays put.
   - warm (cauldron, candle): sits beside it and slow-blinks.
   - shiny within reach: bats at it; the item wobbles.
   - has a top (table, stool): hops up and loafs on it.
@@ -72,7 +73,7 @@ Decorating is the core of the game, so it gets built and playtested first (see M
   - Dropping a surface item onto an occupied slot:
     - From another slot in the room: the two items swap places if each fits in the other's spot (blue highlight).
     - From the tray, or if a swap doesn't fit: the new item replaces what's there, and the replaced item goes back to the tray (amber highlight).
-  - Dropping an item where it doesn't fit snaps it back to where it came from; the drop highlight shows green for a free spot and red where it doesn't fit.
+  - Dropping an item where it doesn't fit snaps it back to where it came from; the drop highlight shows green for a free spot and red only over a spot where the item can't be placed. A surface item over empty space (no furniture or shelf under it) shows no highlight.
 - **Controls:** drag from an inventory tray to place; drag to move; drag back to the tray to remove. Mouse and touch both work. No rotation in v1.
 - **Unlocks:** coins buy items in a simple shop. How unlocks are chosen is decided at milestone 4 (the cat no longer scores rooms).
 - **Catalog size:** 25–30 decor items for v1.

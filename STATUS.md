@@ -1,5 +1,25 @@
 # Status
 
+## Oct 21, 2026 — Cat fixes from code review, and a grumpy wake-up (awaiting playtest)
+
+Two code reviews of the ambient cat found five bugs; Asa also made three design calls.
+
+**Done**
+- If an item moves or disappears while the cat is walking to it, the cat no longer reacts to the old spot (or loafs in mid-air). It gives up, hops down if it was climbing, and visits the moved item later.
+- Petting the cat on its way to (or during) a reaction no longer loses that reaction; the item goes back to the front of its queue.
+- Petting mid-hop, mid-climb, or mid-jump always lands the cat on the ground (or its perch), never in mid-air.
+- Wobbles no longer fight a drag: they skip items being carried (and their riders), redrawn items, and items already wobbling; they're cancelled if the cat is interrupted first.
+- A cat on an idle cozy visit counts as busy, so it no longer turns toward drags mid-reaction.
+- New: sliding a rug out from under a napping cat (or removing it) wakes it right away: it puffs up, shakes, says "hmph!", then carries on. Line and timing in `src/data/cat.ts`; the rug check is `movedOrRemoved` in `src/logic/cat.ts` (tested).
+- CLAUDE.md: shiny/fragile paw-up covers the wall too; the grumpy exception; red highlight shows only where an item can't be placed, none over empty space.
+- 99 unit tests pass. Save format unchanged.
+
+**Not verified**
+- None of this has run in a real browser. Especially worth checking on the phone: the grumpy puff/shake looks cute rather than upset, moving a table while the cat walks up onto it, and petting mid-hop.
+
+**Next**
+- Asa playtests the cat on a phone.
+
 ## Oct 21, 2026 — Ambient cat: don't interrupt the cat (awaiting playtest)
 
 Ambient-cat playtest: wandering is "definitely the right direction", but the cat stopping every time Asa picked up an item broke its flow.

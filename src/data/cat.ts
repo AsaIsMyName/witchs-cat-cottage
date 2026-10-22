@@ -37,6 +37,9 @@ export const IDLE_LINES: Record<IdleAction, string> = {
 
 export const PET_LINE = "purr purr";
 
+/** The one grumpy moment: its rug was pulled out from under a nap. Mild, and never about the item. */
+export const GRUMPY_LINE = "hmph!";
+
 /** Pacing, in milliseconds unless noted. */
 export const CAT_TIMING = {
   walkSpeed: 90, // px per second
@@ -44,4 +47,5 @@ export const CAT_TIMING = {
   reactionLength: 2200,
   napLength: [4000, 7000],
   idleGap: [1500, 4000],
+  grumpyLength: 1600,
 };

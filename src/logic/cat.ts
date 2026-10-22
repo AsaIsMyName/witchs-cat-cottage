@@ -1,6 +1,7 @@
 // The ambient cat's decisions: how it reacts to an item, what it does when idle, and which items
 // are new enough to go look at. Plain TypeScript, no Phaser, so it can be unit tested.
-// The cat never judges: every reaction is positive, playful, or curious.
+// The cat never judges: every reaction is positive, playful, or curious. (The one exception, a
+// grumpy wake-up when its rug is pulled out from under a nap, isn't about the item; see cat-actor.ts.)
 
 import { targetOf, type ItemShape, type Placement, type RoomShape, type RoomState } from "./grid";
 
@@ -81,6 +82,11 @@ export function pickIdle(
 export function changedItems(prev: RoomState, next: RoomState): string[] {
   const before = new Map(prev.placements.map((p) => [p.uid, JSON.stringify(targetOf(p))]));
   return next.placements.filter((p) => before.get(p.uid) !== JSON.stringify(targetOf(p))).map((p) => p.uid);
+}
+
+/** Whether item `uid` was removed or moved between `prev` and `next` (e.g. the rug or table the cat is on). */
+export function movedOrRemoved(prev: RoomState, next: RoomState, uid: string): boolean {
+  return !next.placements.some((p) => p.uid === uid) || changedItems(prev, next).includes(uid);
 }
 
 export function spotOf(state: RoomState, p: Placement): Spot {

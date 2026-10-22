@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { changedItems, pickIdle, reactionFor, type CatBehavior, type TaggedCatalog } from "./cat";
-import { emptyRoom, moveItem, placeFromTray, type RoomShape, type RoomState, type Target } from "./grid";
+import { changedItems, movedOrRemoved, pickIdle, reactionFor, type CatBehavior, type TaggedCatalog } from "./cat";
+import { emptyRoom, moveItem, placeFromTray, removeToTray, type RoomShape, type RoomState, type Target } from "./grid";
 
 const room: RoomShape = { columns: 12, wallRows: 3, floorRows: 3 };
 
@@ -129,5 +129,27 @@ describe("changedItems", () => {
     ]);
     const moved = moveItem(room, catalog, before, "p1", grid(6, 2))!;
     expect(changedItems(before, moved)).toEqual(["p1"]);
+  });
+});
+
+describe("movedOrRemoved", () => {
+  const before = build([
+    ["rug", grid(2, 1)], // p1
+    ["table", grid(2, 1)], // p2, standing on the rug
+    ["rug", grid(8, 2)], // p3
+  ]);
+
+  it("is false while the item stays put, even if things around it change", () => {
+    expect(movedOrRemoved(before, before, "p1")).toBe(false);
+    const tableMoved = moveItem(room, catalog, before, "p2", grid(6, 0))!;
+    expect(movedOrRemoved(before, tableMoved, "p1")).toBe(false);
+  });
+
+  it("is true when the item is moved, swapped, or removed", () => {
+    const moved = moveItem(room, catalog, before, "p1", grid(5, 0))!;
+    expect(movedOrRemoved(before, moved, "p1")).toBe(true);
+    const swapped = moveItem(room, catalog, before, "p1", grid(8, 2))!;
+    expect(movedOrRemoved(before, swapped, "p1")).toBe(true);
+    expect(movedOrRemoved(before, removeToTray(before, "p1"), "p1")).toBe(true);
   });
 });

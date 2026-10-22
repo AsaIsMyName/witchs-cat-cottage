@@ -2,10 +2,10 @@
 // Decisions come from src/logic/cat.ts; this file only animates them.
 
 import * as Phaser from "phaser";
-import { CAT_BEHAVIOR, CAT_TIMING, IDLE_LINES, PET_LINE, REACTION_LINES } from "../data/cat";
+import { CAT_BEHAVIOR, CAT_TIMING, GRUMPY_LINE, IDLE_LINES, PET_LINE, REACTION_LINES } from "../data/cat";
 import { CATALOG } from "../data/items";
 import { BEDROOM } from "../data/rooms";
-import { changedItems, pickIdle, reactionFor, type IdleAction, type Reaction } from "../logic/cat";
+import { changedItems, movedOrRemoved, pickIdle, reactionFor, type IdleAction, type Reaction } from "../logic/cat";
 import type { RoomState } from "../logic/grid";
 import { DEPTH_FLOOR, FLOOR_Y, GAME_WIDTH, ItemView, ROOM_X, TEXT_LIGHT, TILE, textStyle } from "./room-view";
 
@@ -41,6 +41,15 @@ export class CatActor {
   private readonly queue: string[] = [];
   private facing: 1 | -1 = 1;
   private perch?: { uid: string; groundY: number };
+  /** The rug the cat is napping on; moving or removing it wakes the cat up grumpy. */
+  private napRug?: string;
+  /** The queued item the cat is visiting; it goes back in the queue if the cat is interrupted first. */
+  private current?: string;
+  /** Where the cat's feet belong if a hop or jump is cut short, so it never stays in mid-air. */
+  private restY?: number;
+  /** Item views the player is holding; wobbles leave them alone. */
+  private readonly held = new Set<ItemView>();
+  private readonly wobbling = new Set<ItemView>();
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -61,24 +70,29 @@ export class CatActor {
 
   /**
    * Call after every room change, once the item views have been rebuilt. Changed items join the
-   * cat's queue; it gets to them after finishing what it's doing. The one exception: if its perch
-   * was moved or removed, it hops down right away.
+   * cat's queue; it gets to them after finishing what it's doing. The exceptions: if its perch was
+   * moved or removed, it hops down right away; if the rug it's napping on was, it wakes up grumpy.
    */
   roomChanged(prev: RoomState, next: RoomState): void {
-    const changed = changedItems(prev, next);
-    for (const uid of changed) if (!this.queue.includes(uid)) this.queue.push(uid);
+    for (const uid of changedItems(prev, next)) if (!this.queue.includes(uid)) this.queue.push(uid);
 
-    const perch = this.perch;
-    const lostPerch = perch !== undefined && (changed.includes(perch.uid) || !next.placements.some((p) => p.uid === perch.uid));
-    if (!lostPerch) return;
-    this.interrupt();
-    this.mode = "idle";
-    this.hopDown(() => this.later(between(CAT_TIMING.noticeDelay), () => this.next()));
+    if (this.perch && movedOrRemoved(prev, next, this.perch.uid)) {
+      this.interrupt();
+      this.mode = "idle";
+      this.hopDown(() => this.later(between(CAT_TIMING.noticeDelay), () => this.next()));
+    } else if (this.napRug && movedOrRemoved(prev, next, this.napRug)) {
+      this.interrupt();
+      this.grumble();
+    }
   }
 
-  /** The player picked something up. The cat keeps doing what it's doing, but may glance over. */
-  startWatching(x: number): void {
+  /**
+   * The player picked something up. The cat keeps doing what it's doing, but may glance over.
+   * `held` is every item view being carried, so wobbles leave them alone.
+   */
+  startWatching(x: number, held: ItemView[]): void {
     this.watching = true;
+    for (const view of held) this.held.add(view);
     this.glanceAt(x);
   }
 
@@ -89,6 +103,7 @@ export class CatActor {
 
   stopWatching(): void {
     this.watching = false;
+    this.held.clear();
   }
 
   /** Generous hit area so the small cat is easy to tap on a phone. */
@@ -116,6 +131,7 @@ export class CatActor {
       const placement = state.placements.find((p) => p.uid === uid);
       if (!placement || !views.has(uid)) continue;
       this.mode = "busy";
+      this.current = uid;
       this.visit(uid, reactionFor(CATALOG, state, placement, CAT_BEHAVIOR.rules), CAT_TIMING.reactionLength);
       return;
     }
@@ -123,8 +139,10 @@ export class CatActor {
     this.mode = "idle";
     const plan = pickIdle(CATALOG, state, BEDROOM, CAT_BEHAVIOR, Math.random);
     if (plan.kind === "wander") this.wander(plan.col, plan.row, plan.action);
-    else if (views.has(plan.uid)) this.visit(plan.uid, plan.reaction, between(CAT_TIMING.napLength));
-    else this.later(between(CAT_TIMING.idleGap), () => this.next());
+    else if (views.has(plan.uid)) {
+      this.mode = "busy";
+      this.visit(plan.uid, plan.reaction, between(CAT_TIMING.napLength));
+    } else this.later(between(CAT_TIMING.idleGap), () => this.next());
   }
 
   /** Goes to an item and reacts to it. */
@@ -132,19 +150,36 @@ export class CatActor {
     const view = this.getViews().get(uid);
     if (!view) return this.finish();
     const { point, perch } = this.approach(uid, reaction, view);
-    this.walkTo(point, () => {
-      if (perch) {
-        this.perch = { uid, groundY: footprintBottom(view) - 4 };
-        this.updateDepth();
-      }
-      this.turnTo(view.centerX);
-      this.react(reaction, view);
-      this.later(length, () => this.finish());
-    });
+    const groundY = footprintBottom(view) - 4;
+    this.walkTo(
+      point,
+      () => {
+        // Views are rebuilt on every room change, so look the item up again: it may have moved or gone mid-walk.
+        const now = this.getViews().get(uid);
+        const moved = now !== undefined && Phaser.Math.Distance.BetweenPoints(this.approach(uid, reaction, now).point, point) >= 2;
+        if (!now || moved) {
+          // A moved item stays queued, so the cat still comes to see it where it is now.
+          if (moved && !this.queue.includes(uid)) this.queue.push(uid);
+          if (perch) this.hopDown(() => this.finish(), groundY);
+          else this.finish();
+          return;
+        }
+        if (perch) {
+          this.perch = { uid, groundY: footprintBottom(now) - 4 };
+          this.updateDepth();
+        }
+        if (reaction === "nap" && now.def.layer === "rug") this.napRug = uid;
+        this.turnTo(now.centerX);
+        this.react(reaction, now);
+        this.later(length, () => this.finish());
+      },
+      perch ? groundY : undefined,
+    );
   }
 
   private wander(col: number, row: number, action: IdleAction): void {
     this.walkTo(floorPoint(col, row), () => {
+      this.restY = this.cat.y;
       this.say(IDLE_LINES[action]);
       if (action === "nap") this.nap();
       else if (action === "sit") this.squash(0.85);
@@ -154,6 +189,7 @@ export class CatActor {
   }
 
   private react(reaction: Reaction, view: ItemView): void {
+    this.restY = this.cat.y;
     this.say(REACTION_LINES[reaction]);
     switch (reaction) {
       case "nap":
@@ -167,11 +203,11 @@ export class CatActor {
         break;
       case "paw-up":
         this.tween({ targets: this.cat, scaleY: 1.35, duration: 220, yoyo: true, repeat: 2 });
-        this.scene.time.delayedCall(250, () => wobble(this.scene, view));
+        this.later(250, () => this.wobble(view));
         break;
       case "bat":
         this.tween({ targets: this.cat, x: this.cat.x + this.facing * 4, duration: 90, yoyo: true, repeat: 3 });
-        this.scene.time.delayedCall(150, () => wobble(this.scene, view));
+        this.later(150, () => this.wobble(view));
         break;
       case "stare":
         this.tween({ targets: this.cat, y: this.cat.y - 6, duration: 120, yoyo: true });
@@ -199,16 +235,19 @@ export class CatActor {
     return { point: { x, y: footprintBottom(anchor) - 4 }, perch: false };
   }
 
-  private walkTo(point: Point, then: () => void): void {
+  /** Walks to `point`. `landY` is where the cat drops to if interrupted on the way up onto something. */
+  private walkTo(point: Point, then: () => void, landY?: number): void {
     this.bubble.setVisible(false);
     const go = () => {
       const distance = Phaser.Math.Distance.Between(this.cat.x, this.cat.y, point.x, point.y);
       if (distance < 2) return then();
       this.pose = "walking";
+      this.restY = landY;
       this.turnTo(point.x);
       this.cat.setDepth(Math.max(this.cat.depth, depthAt(point.y)));
       const duration = Math.max(150, (distance / CAT_TIMING.walkSpeed) * 1000);
       this.tween({ targets: this.cat, x: point.x, y: point.y, duration, ease: "Linear" }, () => {
+        this.restY = undefined;
         this.pose = "resting";
         this.updateDepth();
         then();
@@ -218,15 +257,25 @@ export class CatActor {
     else go();
   }
 
-  private hopDown(then: () => void): void {
-    const groundY = this.perch?.groundY ?? this.cat.y;
+  private hopDown(then: () => void, groundY = this.perch?.groundY ?? this.cat.y): void {
     this.perch = undefined;
     this.pose = "walking";
+    this.restY = groundY;
     this.tween({ targets: this.cat, y: groundY, duration: 250, ease: "Quad.easeIn" }, () => {
+      this.restY = undefined;
       this.pose = "resting";
       this.updateDepth();
       then();
     });
+  }
+
+  /** Woken by its rug sliding away: puffs up, shakes it off, then gets on with its day. */
+  private grumble(): void {
+    this.mode = "busy";
+    this.say(GRUMPY_LINE);
+    this.tween({ targets: this.cat, scaleX: this.facing * 1.2, scaleY: 1.3, duration: 150, ease: "Back.easeOut" });
+    this.tween({ targets: this.cat, x: this.cat.x + 2, duration: 50, yoyo: true, repeat: 5, delay: 150 });
+    this.later(CAT_TIMING.grumpyLength, () => this.finish());
   }
 
   private finish(): void {
@@ -234,12 +283,24 @@ export class CatActor {
     this.bubble.setVisible(false);
     this.mode = "idle";
     this.pose = "resting";
+    this.current = undefined;
+    this.napRug = undefined;
+    this.restY = undefined;
     this.later(between(CAT_TIMING.idleGap), () => this.next());
   }
 
+  /** Cuts the current action short. An unfinished visit goes back to the front of the queue. */
   private interrupt(): void {
     this.token++;
     this.scene.tweens.killTweensOf(this.cat);
+    if (this.restY !== undefined) {
+      this.cat.y = this.restY;
+      this.restY = undefined;
+      this.updateDepth();
+    }
+    if (this.current && !this.queue.includes(this.current)) this.queue.unshift(this.current);
+    this.current = undefined;
+    this.napRug = undefined;
     this.cat.setScale(this.facing, 1);
     this.cat.angle = 0;
     this.bubble.setVisible(false);
@@ -279,6 +340,31 @@ export class CatActor {
   private updateDepth(): void {
     const host = this.perch && this.getViews().get(this.perch.uid);
     this.cat.setDepth(host ? host.body.depth + 3 : depthAt(this.cat.y));
+  }
+
+  /**
+   * A little shake that leaves the item where it was. Skips items that were redrawn (destroyed),
+   * are being carried, or are already wobbling, so it never fights a drag or a stale position.
+   */
+  private wobble(view: ItemView): void {
+    const off = () => !view.body.active || this.held.has(view);
+    if (off() || this.wobbling.has(view)) return;
+    this.wobbling.add(view);
+    const baseX = view.x;
+    this.scene.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: 500,
+      onUpdate: (tween) => {
+        if (off()) return;
+        const t = tween.getValue() ?? 1;
+        view.setPosition(baseX + Math.sin(t * Math.PI * 6) * 3 * (1 - t), view.y);
+      },
+      onComplete: () => {
+        this.wobbling.delete(view);
+        if (!off()) view.setPosition(baseX, view.y);
+      },
+    });
   }
 
   /** Runs `fn` after `ms`, unless the cat was interrupted in the meantime. */
@@ -333,19 +419,4 @@ function depthAt(y: number): number {
 
 function between([min, max]: number[]): number {
   return Phaser.Math.Between(min, max);
-}
-
-/** A little shake that leaves the item where it was. */
-function wobble(scene: Phaser.Scene, view: ItemView): void {
-  const baseX = view.x;
-  scene.tweens.addCounter({
-    from: 0,
-    to: 1,
-    duration: 500,
-    onUpdate: (tween) => {
-      const t = tween.getValue() ?? 1;
-      view.setPosition(baseX + Math.sin(t * Math.PI * 6) * 3 * (1 - t), view.y);
-    },
-    onComplete: () => view.setPosition(baseX, view.y),
-  });
 }

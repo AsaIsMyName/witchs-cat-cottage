@@ -182,7 +182,7 @@ export class DecorateScene extends Phaser.Scene {
     this.dragged = true;
     view.setDepth(DEPTH_DRAGGING);
     for (const child of children) child.view.setDepth(DEPTH_DRAGGING + 2);
-    this.cat.startWatching(pointer.worldX);
+    this.cat.startWatching(pointer.worldX, [view, ...children.map((c) => c.view)]);
   }
 
   private onDrag(pointer: Phaser.Input.Pointer): void {
