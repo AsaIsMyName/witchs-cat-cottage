@@ -29,8 +29,8 @@ Decided Oct 21, 2026, after the milestone 2 playtest: a scored cat review made d
 - **Tags pick reactions:** every decor item has 1–3 tags (cozy, soft, warm, shiny, spooky, fragile, tall, …). Tags choose *which* reaction the cat does, not whether it approves.
 - **Behavior (scripted, no real AI or pathfinding in v1):**
   - Idle: wanders, sits, grooms, or naps, drifting toward cozy spots (e.g. a rug or near the cauldron) when there are some.
-  - When an item is placed or moved, the cat finishes what it's doing, then after a short pause strolls over and reacts. Several new items are visited one at a time, at the cat's own pace.
-  - While the player drags something, the cat stops and turns to watch.
+  - When an item is placed or moved, the cat finishes what it's doing (including a nap), then strolls over and reacts. Several new items are visited one at a time, at the cat's own pace.
+  - Player actions never interrupt the cat's flow. While the player drags something, an idle cat that's sitting still glances toward it; a walking, napping, or reacting cat carries on.
   - Tapping the cat pets it: it purrs, a heart floats up, and it rolls over. A drag that starts on the cat still picks up the item underneath.
   - If the item the cat is sitting on is removed or moved, the cat hops down, unbothered.
 - **Reactions (first match wins; values in `src/data/cat.ts`):**

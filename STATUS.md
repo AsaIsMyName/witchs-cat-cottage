@@ -1,5 +1,17 @@
 # Status
 
+## Oct 21, 2026 — Ambient cat: don't interrupt the cat (awaiting playtest)
+
+Ambient-cat playtest: wandering is "definitely the right direction", but the cat stopping every time Asa picked up an item broke its flow.
+
+**Done**
+- Picking up an item no longer interrupts the cat. A walking, napping, or reacting cat carries on; an idle cat sitting still just glances toward what's being dragged.
+- Dropping an item no longer cuts the cat's current action short (even a nap); it finishes, then comes over.
+- Only exception: if the furniture it's sitting on is moved or removed, it hops down right away.
+
+**Next**
+- Asa playtests the cat's flow on a phone.
+
 ## Oct 21, 2026 — Milestone 2, take 2: Ambient cat (built, awaiting playtest)
 
 Scored-review playtest: nothing broke, but **no-go** on the design. The score made decorating feel like a puzzle with wrong answers, and the cat didn't make Asa want to rearrange. CLAUDE.md now describes the cat as an ambient companion.

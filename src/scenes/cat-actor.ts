@@ -18,8 +18,11 @@ const COLOR_HEART = "#f28fb0";
 const DEPTH_BUBBLE = 950;
 const BUBBLE_OFFSET = BODY_H + HEAD + 8;
 
-/** idle: doing its own thing, and any change gets its attention. busy: reacting or being petted; finishes first. */
-type Mode = "idle" | "busy" | "watching";
+/** idle: doing its own thing. busy: reacting to an item or being petted. */
+type Mode = "idle" | "busy";
+
+/** What the cat's body is doing right now; only a resting cat glances at drags. */
+type Pose = "walking" | "resting" | "napping";
 
 interface Point {
   x: number;
@@ -30,6 +33,9 @@ export class CatActor {
   private readonly cat: Phaser.GameObjects.Container;
   private readonly bubble: Phaser.GameObjects.Text;
   private mode: Mode = "idle";
+  private pose: Pose = "resting";
+  /** True while the player is dragging something. */
+  private watching = false;
   /** Bumped on every interrupt; scheduled steps from an older token are dropped. */
   private token = 0;
   private readonly queue: string[] = [];
@@ -53,39 +59,36 @@ export class CatActor {
     this.later(between(CAT_TIMING.idleGap), () => this.next());
   }
 
-  /** Call after every room change, once the item views have been rebuilt. */
+  /**
+   * Call after every room change, once the item views have been rebuilt. Changed items join the
+   * cat's queue; it gets to them after finishing what it's doing. The one exception: if its perch
+   * was moved or removed, it hops down right away.
+   */
   roomChanged(prev: RoomState, next: RoomState): void {
     const changed = changedItems(prev, next);
     for (const uid of changed) if (!this.queue.includes(uid)) this.queue.push(uid);
 
     const perch = this.perch;
     const lostPerch = perch !== undefined && (changed.includes(perch.uid) || !next.placements.some((p) => p.uid === perch.uid));
-    const wantsToLook = this.mode === "idle" && changed.length > 0;
-    if (!lostPerch && !wantsToLook) return;
-
+    if (!lostPerch) return;
     this.interrupt();
     this.mode = "idle";
-    const resume = () => this.later(between(CAT_TIMING.noticeDelay), () => this.next());
-    if (lostPerch) this.hopDown(resume);
-    else resume();
+    this.hopDown(() => this.later(between(CAT_TIMING.noticeDelay), () => this.next()));
   }
 
+  /** The player picked something up. The cat keeps doing what it's doing, but may glance over. */
   startWatching(x: number): void {
-    this.interrupt();
-    this.mode = "watching";
-    this.face(x);
+    this.watching = true;
+    this.glanceAt(x);
   }
 
-  face(x: number): void {
-    if (Math.abs(x - this.cat.x) < 4) return;
-    this.facing = x < this.cat.x ? -1 : 1;
-    this.cat.scaleX = this.facing;
+  /** Turns toward `x`, but only if the cat is idle and sitting still. */
+  glanceAt(x: number): void {
+    if (this.watching && this.mode === "idle" && this.pose === "resting") this.turnTo(x);
   }
 
   stopWatching(): void {
-    if (this.mode !== "watching") return;
-    this.mode = "idle";
-    this.later(between(CAT_TIMING.noticeDelay), () => this.next());
+    this.watching = false;
   }
 
   /** Generous hit area so the small cat is easy to tap on a phone. */
@@ -95,7 +98,6 @@ export class CatActor {
   }
 
   pet(): void {
-    if (this.mode === "watching") return;
     this.interrupt();
     this.mode = "busy";
     this.say(PET_LINE);
@@ -107,7 +109,6 @@ export class CatActor {
   }
 
   private next(): void {
-    if (this.mode === "watching") return;
     const state = this.getState();
     const views = this.getViews();
     while (this.queue.length > 0) {
@@ -136,7 +137,7 @@ export class CatActor {
         this.perch = { uid, groundY: footprintBottom(view) - 4 };
         this.updateDepth();
       }
-      this.face(view.centerX);
+      this.turnTo(view.centerX);
       this.react(reaction, view);
       this.later(length, () => this.finish());
     });
@@ -145,7 +146,7 @@ export class CatActor {
   private wander(col: number, row: number, action: IdleAction): void {
     this.walkTo(floorPoint(col, row), () => {
       this.say(IDLE_LINES[action]);
-      if (action === "nap") this.squash(0.6);
+      if (action === "nap") this.nap();
       else if (action === "sit") this.squash(0.85);
       else this.tween({ targets: this.cat, y: this.cat.y - 2, duration: 200, yoyo: true, repeat: 3 });
       this.later(action === "nap" ? between(CAT_TIMING.napLength) : between(CAT_TIMING.idleGap), () => this.finish());
@@ -156,7 +157,7 @@ export class CatActor {
     this.say(REACTION_LINES[reaction]);
     switch (reaction) {
       case "nap":
-        this.squash(0.6);
+        this.nap();
         break;
       case "warm":
         this.squash(0.8);
@@ -203,10 +204,12 @@ export class CatActor {
     const go = () => {
       const distance = Phaser.Math.Distance.Between(this.cat.x, this.cat.y, point.x, point.y);
       if (distance < 2) return then();
-      this.face(point.x);
+      this.pose = "walking";
+      this.turnTo(point.x);
       this.cat.setDepth(Math.max(this.cat.depth, depthAt(point.y)));
       const duration = Math.max(150, (distance / CAT_TIMING.walkSpeed) * 1000);
       this.tween({ targets: this.cat, x: point.x, y: point.y, duration, ease: "Linear" }, () => {
+        this.pose = "resting";
         this.updateDepth();
         then();
       });
@@ -218,7 +221,9 @@ export class CatActor {
   private hopDown(then: () => void): void {
     const groundY = this.perch?.groundY ?? this.cat.y;
     this.perch = undefined;
+    this.pose = "walking";
     this.tween({ targets: this.cat, y: groundY, duration: 250, ease: "Quad.easeIn" }, () => {
+      this.pose = "resting";
       this.updateDepth();
       then();
     });
@@ -228,6 +233,7 @@ export class CatActor {
     this.cat.setScale(this.facing, 1);
     this.bubble.setVisible(false);
     this.mode = "idle";
+    this.pose = "resting";
     this.later(between(CAT_TIMING.idleGap), () => this.next());
   }
 
@@ -237,6 +243,18 @@ export class CatActor {
     this.cat.setScale(this.facing, 1);
     this.cat.angle = 0;
     this.bubble.setVisible(false);
+    this.pose = "resting";
+  }
+
+  private turnTo(x: number): void {
+    if (Math.abs(x - this.cat.x) < 4) return;
+    this.facing = x < this.cat.x ? -1 : 1;
+    this.cat.scaleX = this.facing;
+  }
+
+  private nap(): void {
+    this.pose = "napping";
+    this.squash(0.6);
   }
 
   private squash(scaleY: number): void {

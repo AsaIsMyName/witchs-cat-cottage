@@ -193,7 +193,7 @@ export class DecorateScene extends Phaser.Scene {
     drag.view.setPosition(x, y);
     for (const child of drag.children) child.view.setPosition(x + child.dx, y + child.dy);
     this.drawHighlight(drag, pointer);
-    this.cat.face(pointer.worldX);
+    this.cat.glanceAt(pointer.worldX);
   }
 
   private onDragEnd(pointer: Phaser.Input.Pointer): void {
