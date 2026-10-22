@@ -4,6 +4,15 @@
 
 From the playtest: the cat walked straight (often diagonally) over placed items, and drew on top of things it should pass behind.
 
+**Follow-up: pre-merge cleanup (from both code reviews; Asa approved, movement already signed off)**
+- Climbing never ties with walking around: every hop adds a tiny `HOP_TIE_BREAK` (1e-6) in `route.ts`, so on equal cost the route with fewer hops wins. A test builds a genuine tie (climbCost 2, stool vs. a 4-step detour through the front row) that climbed before the fix.
+- Step-off is always legal: a blocked start now steps only to a free orthogonal neighbour (a diagonal is never nearer than its corners, and past a blocked one it would cut the corner). Boxed in, it returns no legs and stays put, as the scene already handled.
+- The last leg re-plans if the room changed during it and the cat ended on a blocked tile (e.g. a cauldron dropped on its goal). New pure helper `canStand`.
+- Scene leg fix-ups moved to a new pure `planWalk` (exact-spot leg on the goal tile, edge tile before hopping off mid-table, final hop then walk to the spot), now unit tested. New: perched with the goal on that perch, it walks across the top to the exact spot instead of reacting from where it stands.
+- Comments: fixed the mojibake `×` in route.ts; removed the redundant perch reset in `visit()` (it re-set the same `groundY`) and fixed its comment.
+- 17 new tests (route, `planWalk`, `canStand`); the "doesn't step back" test asserts exact legs. 154 unit tests pass.
+- Re-test (should look unchanged): loaf on the table and dismount from the middle; wall it in with tables; drop a cauldron right on the cat, and on the spot it's walking to just before it arrives.
+
 **Follow-up (Asa's playtest of e6e9cb4): slower arcing hops, edge climbs, natural dismounts**
 - Hops are slower and arc: a hop on, off, or between tops takes `CAT_TIMING.hop` 400ms (was 300). The straight hop down when a perch is moved or removed takes `hopDown` 350ms (was 250). Both rise `hopArc` 6px above a straight line mid-hop. Movement tweens now drive a progress counter, and `interrupt()` removes the current one.
 - Dismounts: starting a walk while perched no longer drops straight down first. The route starts on top, so the cat walks to the edge it's heading for (from the middle of a table, first to that edge tile's center) and hops off in one arc onto the next floor tile of its route.
@@ -141,7 +150,7 @@ Ambient-cat playtest: **go.** The cat makes decorating feel cozier. All cat fixe
 - CLAUDE.md updated: decorating section, scope table, milestone 4, open questions.
 
 **Can wait (from the pre-merge reviews, all low)**
-- An interrupted walk doesn't reset the cat's draw depth, so it can draw over front furniture until its next walk.
+- ~~An interrupted walk doesn't reset the cat's draw depth.~~ Mostly fixed: floor legs now track depth every frame, and `interrupt()` updates it when it drops the cat to the floor.
 - A pet right as a groom ends can leave the cat up to 2px off the floor.
 - Picking up the item the cat is walking to makes it give up and come back later.
 - An interrupted climb snaps the cat straight down instead of back to its row.

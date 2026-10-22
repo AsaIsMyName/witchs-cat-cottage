@@ -1,6 +1,6 @@
 // The cat's walking routes on the floor grid. Plain TypeScript, no Phaser, so it can be unit tested.
 //
-// The cat walks on floor tiles (columns Ã— floor rows). Tiles under floor-layer items are blocked;
+// The cat walks on floor tiles (columns × floor rows). Tiles under floor-layer items are blocked;
 // rugs and the wall layer don't touch its path. Furniture with a top (table, stool) can be climbed:
 // each hop up costs extra, so the cat only goes over it when walking around is much longer or
 // impossible. Once up, it walks across the top and hops off the edge on its way.
@@ -38,13 +38,32 @@ export interface RouteOptions {
   endOnTop?: boolean;
 }
 
+/** A route the scene can walk as is (see `planWalk`). */
+export interface Walk extends Route {
+  /** The last leg ends at the walk's exact point, not its tile's center: true when the goal tile was reached. */
+  exact: boolean;
+}
+
+export interface WalkOptions extends RouteOptions {
+  /** Up on a top, but not at the center of its tile (e.g. loafing in the middle of a table). */
+  offCenter?: boolean;
+}
+
+/**
+ * Extra cost of every hop, so a route with fewer hops wins an exact tie (the cat only climbs when
+ * walking around is really longer). Costs are sums of whole steps, √2 diagonals, `climbCost`, and
+ * `frontBackHopCost`, so genuine differences between routes are far bigger than this.
+ */
+const HOP_TIE_BREAK = 1e-6;
+
 /** What's on a floor tile: nothing (rugs count as nothing), climbable furniture, or a solid item. */
 type Cell = { kind: "free" } | { kind: "top"; uid: string } | { kind: "solid" };
 
 /**
  * A route from `from` to `to`. Diagonal steps need both orthogonal neighbours free (no corner
- * cutting) and never happen on furniture. A start on a blocked tile first steps off to the nearest
- * free tile; an unreachable destination ends at the nearest free tile the cat can reach.
+ * cutting) and never happen on furniture. A start on a blocked tile first steps off to a free
+ * neighbouring tile (no legs at all if there's none); an unreachable destination ends at the
+ * nearest free tile the cat can reach.
  */
 export function findRoute(
   room: RoomShape,
@@ -84,6 +103,47 @@ export function findRoute(
   }
   legs.push(...collapse(cells, origin, path));
   return { legs, reached: end };
+}
+
+/**
+ * `findRoute`, plus the legs the scene needs to end at an exact point inside the goal tile:
+ * - Already on the goal tile: one short leg to the exact spot (on the floor, or across the perch it's up on).
+ * - Up on a top but off its tile's center, about to hop off: first to that tile's center, so it hops from the edge.
+ * - Ending with a hop onto furniture: hop onto the tile, then walk across the top to the exact spot.
+ */
+export function planWalk(
+  room: RoomShape,
+  catalog: Catalog,
+  state: RoomState,
+  from: Tile,
+  to: Tile,
+  options: WalkOptions,
+): Walk {
+  const route = findRoute(room, catalog, state, from, to, options);
+  const start = clampTile(room, from);
+  const goal = clampTile(room, to);
+  const startCell = floorCells(room, catalog, state)[start.row][start.col];
+  const perch = options.onTop === true && startCell.kind === "top" ? startCell.uid : undefined;
+  const exact = route.reached.col === goal.col && route.reached.row === goal.row;
+
+  const legs = [...route.legs];
+  if (legs.length === 0 && exact) {
+    legs.push(perch === undefined ? { ...goal, climb: false } : { ...goal, climb: true, on: perch });
+  }
+  if (perch !== undefined && options.offCenter === true && legs.length > 0 && legs[0].on !== perch) {
+    legs.unshift({ ...start, climb: true, on: perch });
+  }
+  const last = legs.at(-1);
+  const beforeLast = legs.length >= 2 ? legs[legs.length - 2].on : perch;
+  if (exact && last?.climb && last.on !== beforeLast) legs.push({ ...last });
+  return { legs, reached: route.reached, exact };
+}
+
+/** Whether the cat can stay on `tile`: it's free, or it's the top of `perch`, the furniture the cat is up on. */
+export function canStand(room: RoomShape, catalog: Catalog, state: RoomState, tile: Tile, perch?: string): boolean {
+  const t = clampTile(room, tile);
+  const c = floorCells(room, catalog, state)[t.row][t.col];
+  return c.kind === "free" || (c.kind === "top" && c.uid === perch);
 }
 
 function floorCells(room: RoomShape, catalog: Catalog, state: RoomState): Cell[][] {
@@ -136,6 +196,7 @@ function search(room: RoomShape, cells: Cell[][], origin: Tile, climbCost: numbe
         // A hop: onto a top, off it, or from one top to another. Hops are never diagonal.
         const nextOn = target.kind === "top" ? target.uid : undefined;
         if (nextOn !== hereOn) {
+          step += HOP_TIE_BREAK;
           if (nextOn !== undefined) step += climbCost;
           if (dr !== 0) step += frontBackHopCost;
         }
@@ -151,16 +212,19 @@ function search(room: RoomShape, cells: Cell[][], origin: Tile, climbCost: numbe
 }
 
 /**
- * The nearest free tile to a blocked start. The cat stands at the front edge of its tile, so on a
- * tie it prefers not to step back through the item, then the tile closer to where it's going.
+ * A free tile beside a blocked start, so the step off never passes through anything. Only the four
+ * orthogonal neighbours count: a diagonal past free corners is never nearer than those corners, and
+ * past a blocked one it would cut the corner. The cat stands at the front edge of its tile, so it
+ * prefers not to step back through the item, then the tile closer to where it's going. None if it's boxed in.
  */
 function stepOff(room: RoomShape, cells: Cell[][], start: Tile, goal: Tile): Tile | undefined {
   let best: { tile: Tile; score: number[] } | undefined;
-  forEachTile(room, (tile) => {
-    if (cells[tile.row][tile.col].kind !== "free") return;
-    const score = [distance(tile, start), tile.row < start.row ? 1 : 0, distance(tile, goal)];
+  for (const [dc, dr] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
+    const tile = { col: start.col + dc, row: start.row + dr };
+    if (!inRoom(room, tile) || cells[tile.row][tile.col].kind !== "free") continue;
+    const score = [dr < 0 ? 1 : 0, distance(tile, goal)];
     if (!best || lessThan(score, best.score)) best = { tile, score };
-  });
+  }
   return best?.tile;
 }
 

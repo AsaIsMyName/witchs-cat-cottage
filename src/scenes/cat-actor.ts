@@ -17,7 +17,7 @@ import {
   type Reaction,
 } from "../logic/cat";
 import type { RoomState } from "../logic/grid";
-import { findRoute, type Leg, type Tile } from "../logic/route";
+import { canStand, planWalk, type Leg, type Tile } from "../logic/route";
 import { DEPTH_FLOOR, FLOOR_Y, GAME_WIDTH, ItemView, ROOM_X, TEXT_LIGHT, TILE, textStyle } from "./room-view";
 
 const BODY_W = 30;
@@ -263,11 +263,7 @@ export class CatActor {
           else this.finish();
           return;
         }
-        // A perch it couldn't reach (boxed in) gets the reaction from the nearest spot on the floor.
-        if (perch && this.perch?.uid === uid) {
-          this.perch = { uid, groundY: footprintBottom(now) - 4 };
-          this.updateDepth();
-        }
+        // A perch it couldn't reach (boxed in) left the route on the nearest floor tile; it reacts from there.
         if (reaction === "nap" && now.def.layer === "rug") this.napRug = uid;
         this.turnTo(now.centerX);
         this.react(reaction, now);
@@ -363,30 +359,39 @@ export class CatActor {
     this.walkRoute(point, goal, host !== undefined, then);
   }
 
-  /** Plans a route from where the cat is and walks its legs in turn, re-planning if the room changed meanwhile. */
+  /**
+   * Plans a route from where the cat is and walks its legs in turn, re-planning if the room changed
+   * meanwhile. A change during the last leg only re-plans if it left the cat on a blocked tile.
+   */
   private walkRoute(point: Point, goal: Tile, endOnTop: boolean, then: () => void): void {
     const state = this.getState();
-    const perch = this.perch?.uid;
-    const from = tileAt(this.cat.x, this.perch?.groundY ?? this.cat.y);
+    const from = this.tileHere();
     const { climbCost, frontBackHopCost } = CAT_TIMING;
-    const route = findRoute(BEDROOM, CATALOG, state, from, goal, { climbCost, frontBackHopCost, onTop: perch !== undefined, endOnTop });
-    const atGoal = route.reached.col === goal.col && route.reached.row === goal.row;
-    // Already on the goal tile: just the last few pixels to the exact spot.
-    const legs: Leg[] = route.legs.length === 0 && atGoal && perch === undefined ? [{ ...goal, climb: false }] : [...route.legs];
-    // About to hop off from somewhere between tiles (e.g. a loaf in the middle of a table): walk to the edge tile first.
-    if (perch !== undefined && legs.length > 0 && legs[0].on !== perch && Math.abs(this.cat.x - floorPoint(from.col, from.row).x) >= 2) {
-      legs.unshift({ ...from, climb: true, on: perch });
-    }
-    // Ending with a hop onto furniture: hop onto the tile, then walk across the top to the exact spot.
-    const last = legs.at(-1);
-    const beforeLast = legs.length >= 2 ? legs[legs.length - 2].on : perch;
-    if (atGoal && last?.climb && last.on !== beforeLast) legs.push({ ...last });
+    const offCenter = Math.abs(this.cat.x - floorPoint(from.col, from.row).x) >= 2;
+    const { legs, exact } = planWalk(BEDROOM, CATALOG, state, from, goal, {
+      climbCost,
+      frontBackHopCost,
+      onTop: this.perch !== undefined,
+      endOnTop,
+      offCenter,
+    });
     const step = (i: number) => {
-      if (i >= legs.length) return this.arrive(then);
-      if (this.getState() !== state) return this.walkRoute(point, goal, endOnTop, then);
-      this.walkLeg(legs[i], i === legs.length - 1 && atGoal ? point : undefined, () => step(i + 1));
+      const now = this.getState();
+      if (i >= legs.length) {
+        if (now !== state && !canStand(BEDROOM, CATALOG, now, this.tileHere(), this.perch?.uid)) {
+          return this.walkRoute(point, goal, endOnTop, then);
+        }
+        return this.arrive(then);
+      }
+      if (now !== state) return this.walkRoute(point, goal, endOnTop, then);
+      this.walkLeg(legs[i], i === legs.length - 1 && exact ? point : undefined, () => step(i + 1));
     };
     step(0);
+  }
+
+  /** The floor tile the cat is on (for a perch, the furniture's front-row tile under it). */
+  private tileHere(): Tile {
+    return tileAt(this.cat.x, this.perch?.groundY ?? this.cat.y);
   }
 
   /**
