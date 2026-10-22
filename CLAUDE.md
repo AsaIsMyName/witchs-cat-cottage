@@ -78,6 +78,10 @@ Decorating is the core of the game, so it gets built and playtested first (see M
   - Dropping an item where it doesn't fit snaps it back to where it came from; the drop highlight shows green for a free spot and red only over a spot where the item can't be placed. A surface item over empty space (no furniture or shelf under it) shows no highlight.
 - **Controls:** drag from an inventory tray to place; drag to move; drag back to the tray to remove. Mouse and touch both work. No rotation in v1.
 - **Unlocks:** coins buy items in a simple shop. How unlocks are chosen is decided at milestone 4 (the cat no longer scores rooms).
+- **Cat moments scrapbook (milestone 4):** a page that collects the cat's moments as you discover them, as a gentle reason to try new items. Decorating with a variety of items stays the main goal; the scrapbook only supports it.
+  - A light completionist pull is fine (e.g. a few undiscovered hints or a soft count), but it must never feel like a checklist you decorate to tick off.
+  - Not tied to coins at first; revisit when deciding what drives coins at milestone 4.
+  - Entry type is decided at milestone 4; leaning toward hand-written moments over one entry per item and reaction.
 - **Catalog size:** 25–30 decor items for v1.
 - **No fail state and no score.**
 
@@ -92,6 +96,7 @@ Anything not on the "In v1" list is out until v1 is playable end to end. Claude 
 | One ambient cat with fixed reactions | Story, dialogue, quests |
 | Clean → decorate loop, with the cat in the room | Item rotation, multi-tile wall art |
 | Coins and a simple shop | Accounts, cloud save, leaderboards |
+| Cat moments scrapbook | |
 | Local save in the browser | Monetization, ads |
 | Mouse and touch drag | App store builds |
 | Placeholder art, then Claude-made props + a bought cat sprite | Music (basic sound effects are fine in the polish milestone) |
@@ -130,7 +135,7 @@ Decorating is built before cleaning because it is the core of the game; if it is
 1. **Decorate sandbox:** one room grid, 10 rectangle items, drag to place, move, and remove, local save. *Test: is arranging things satisfying on its own?*
 2. **Ambient cat:** tags, an always-present cat that wanders, reacts to new items, watches you drag, and can be petted. *Test: does having the cat around make decorating feel cozier and make you want to keep going?* (A first version with a scored review was tried and dropped; see "The cat".)
 3. **Cleaning phase:** 8–15 items before decorating, coin reward. *Test: does it feel like a warm-up or a chore?*
-4. **Progression:** shop, unlocks, all 3 rooms, 25–30 items.
+4. **Progression:** shop, unlocks, all 3 rooms, 25–30 items, cat moments scrapbook.
 5. **Art pass:** bought cat sprite, Claude-made props in its palette.
 6. **Feel pass:** sound effects, small animations, phone control tuning.
 
@@ -158,7 +163,7 @@ These need Asa's decision; the first two block the art pass, the third blocks mi
 - [ ] Prop size: 16×16 or 32×32 pixels?
 - [x] Camera view: straight top-down (simplest) or a front-facing room view (prettier, harder)? → **Front-facing room view** (decided Oct 21, 2026).
 - [ ] Does the cat have a name and personality, and should its reactions ever change? → **Partly decided (Oct 21, 2026):** unnamed with fixed reactions in v1; revisit after playtesting.
-- [ ] Should there be a gentle goal, such as a "cat moments" journal collecting the reactions you've discovered? Decide after the ambient-cat playtest.
+- [x] Should there be a gentle goal, such as a "cat moments" journal collecting the reactions you've discovered? → **Yes, a scrapbook built in milestone 4** (decided Oct 22, 2026). Light completionist touch, not tied to coins at first; entry type decided at milestone 4 (see "Decorating phase and unlocks").
 - [ ] Without a cat score, what drives coins and unlocks beyond cleaning? Decide at milestone 4.
 - [x] Hosting: GitHub Pages or itch.io? → **GitHub Pages** (decided Oct 21, 2026). Every push to `main` deploys automatically.
 

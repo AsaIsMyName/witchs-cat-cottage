@@ -1,5 +1,24 @@
 # Status
 
+## Oct 22, 2026 — Milestone 2: go. Cat moments scrapbook decided
+
+Ambient-cat playtest: **go.** The cat makes decorating feel cozier. All cat fixes through `c215175` are merged to `main` and deployed.
+
+**Decided**
+- A "cat moments" scrapbook, built in milestone 4 once the catalog is 25–30 items. Decorating with a variety of items stays the main goal.
+- A light completionist touch is welcome, but it must not turn into a checklist. Not tied to coins at first.
+- Entry type is decided at milestone 4. Asa is leaning toward hand-written moments.
+- CLAUDE.md updated: decorating section, scope table, milestone 4, open questions.
+
+**Can wait (from the pre-merge reviews, all low)**
+- An interrupted walk doesn't reset the cat's draw depth, so it can draw over front furniture until its next walk.
+- A pet right as a groom ends can leave the cat up to 2px off the floor.
+- Picking up the item the cat is walking to makes it give up and come back later.
+- An interrupted climb snaps the cat straight down instead of back to its row.
+
+**Next**
+- Milestone 3: cleaning phase. Plan first, for Asa's approval.
+
 ## Oct 22, 2026 — The cat stands on the item's side of the table (awaiting playtest)
 
 **Done**
