@@ -98,22 +98,26 @@ export function canPlace(
 }
 
 /**
- * What a drop at `target` would do. "replace" means it lands on an occupied surface slot,
- * and the item already there goes back to the tray.
+ * What a drop at `target` would do when it lands on an occupied surface slot:
+ * - "swap": the dropped item came from the room and the item already there can take its old spot.
+ * - "replace": otherwise, the item already there goes back to the tray.
  */
-export type DropKind = "place" | "replace" | "blocked";
+export type DropKind = "place" | "swap" | "replace" | "blocked";
 
+/** `movingUid` is the placement being moved, or undefined for an item coming from the tray. */
 export function dropKind(
   room: RoomShape,
   catalog: Catalog,
   state: RoomState,
   itemId: string,
   target: Target,
-  ignoreUid?: string,
+  movingUid?: string,
 ): DropKind {
-  if (canPlace(room, catalog, state, itemId, target, ignoreUid)) return "place";
-  const cleared = clearSlot(state, target, ignoreUid);
-  return cleared !== state && canPlace(room, catalog, cleared, itemId, target, ignoreUid) ? "replace" : "blocked";
+  if (canPlace(room, catalog, state, itemId, target, movingUid)) return "place";
+  const occupant = occupantAt(state, target, movingUid);
+  if (!occupant) return "blocked";
+  if (movingUid !== undefined && swapWith(room, catalog, state, movingUid, target, occupant)) return "swap";
+  return canPlace(room, catalog, removeToTray(state, occupant.uid), itemId, target, movingUid) ? "replace" : "blocked";
 }
 
 /** Place an item from the tray, replacing a surface item if needed. Returns null if it doesn't fit or none are left. */
@@ -135,8 +139,9 @@ export function placeFromTray(
 }
 
 /**
- * Move a placed item, replacing a surface item if needed. Anything on top of a moved item stays on it.
- * Returns null if it doesn't fit.
+ * Move a placed item. On an occupied surface slot it swaps places with the item there,
+ * or sends that item to the tray if it can't take the old spot. Anything on top of a moved
+ * item stays on it. Returns null if it doesn't fit.
  */
 export function moveItem(
   room: RoomShape,
@@ -146,7 +151,11 @@ export function moveItem(
   target: Target,
 ): RoomState | null {
   const current = state.placements.find((p) => p.uid === uid);
-  if (!current || dropKind(room, catalog, state, current.itemId, target, uid) === "blocked") return null;
+  if (!current) return null;
+  const kind = dropKind(room, catalog, state, current.itemId, target, uid);
+  if (kind === "blocked") return null;
+  const occupant = occupantAt(state, target, uid);
+  if (kind === "swap" && occupant) return swapWith(room, catalog, state, uid, target, occupant);
   const base = clearSlot(state, target, uid);
   const moved = toPlacement(uid, current.itemId, current.layer, target);
   return { ...base, placements: base.placements.map((p) => (p.uid === uid ? moved : p)) };
@@ -195,11 +204,42 @@ export function targetOf(p: Placement): Target {
     : { kind: "grid", col: p.col, row: p.row };
 }
 
+/** The surface item in a surface target's slot, other than `ignoreUid`. */
+function occupantAt(state: RoomState, target: Target, ignoreUid?: string): SurfacePlacement | undefined {
+  if (target.kind !== "surface") return undefined;
+  return surfaceItemsOn(state, target.hostUid).find((p) => p.slot === target.slot && p.uid !== ignoreUid);
+}
+
 /** Sends whatever sits in a surface target's slot (other than `ignoreUid`) back to the tray. */
 function clearSlot(state: RoomState, target: Target, ignoreUid?: string): RoomState {
-  if (target.kind !== "surface") return state;
-  const occupant = surfaceItemsOn(state, target.hostUid).find((p) => p.slot === target.slot && p.uid !== ignoreUid);
+  const occupant = occupantAt(state, target, ignoreUid);
   return occupant ? removeToTray(state, occupant.uid) : state;
+}
+
+/** Moves `uid` to `target` and `occupant` to the old spot of `uid`, or null if either doesn't fit. */
+function swapWith(
+  room: RoomShape,
+  catalog: Catalog,
+  state: RoomState,
+  uid: string,
+  target: Target,
+  occupant: Placement,
+): RoomState | null {
+  const current = state.placements.find((p) => p.uid === uid);
+  if (!current) return null;
+  const oldSpot = targetOf(current);
+  const next: RoomState = {
+    ...state,
+    placements: state.placements.map((p) => {
+      if (p.uid === uid) return toPlacement(uid, current.itemId, current.layer, target);
+      if (p.uid === occupant.uid) return toPlacement(occupant.uid, occupant.itemId, occupant.layer, oldSpot);
+      return p;
+    }),
+  };
+  const fits =
+    canPlace(room, catalog, next, current.itemId, target, uid) &&
+    canPlace(room, catalog, next, occupant.itemId, oldSpot, occupant.uid);
+  return fits ? next : null;
 }
 
 function toPlacement(uid: string, itemId: string, layer: Layer, target: Target): Placement {

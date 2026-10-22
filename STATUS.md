@@ -1,6 +1,19 @@
 # Status
 
-## Oct 21, 2026 — Surface swapping (awaiting playtest)
+## Oct 21, 2026 — Swap places in the room (awaiting playtest)
+
+Surface replacing playtest: passed. Asa asked that two room items swap places instead.
+
+**Done**
+- Moving a candle or potion onto another one in the room swaps their places (blue highlight). From the tray it still replaces and sends the old item to the tray (amber).
+- 61 unit tests pass. Save format unchanged.
+
+**Next**
+- Asa playtests swapping on a phone.
+- Open question: should wall and floor items swap too?
+- Then milestone 2: cat reactor.
+
+## Oct 21, 2026 — Surface swapping
 
 Rugs, shelves, and reset playtest: passed. Placeholder tables fully hide rugs; Asa accepted that for now, and CLAUDE.md now requires the art pass to keep rugs visible.
 

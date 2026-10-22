@@ -148,12 +148,28 @@ describe("replacing surface items", () => {
     expect(s?.inventory.potion).toBe(1);
   });
 
-  it("sends the old item to the tray when moving onto an occupied slot", () => {
-    let s = placeFromTray(room, catalogWithPotion, setup(), "candle", { kind: "surface", hostUid: "p2", slot: 1 })!;
-    s = moveItem(room, catalogWithPotion, s, "p4", { kind: "surface", hostUid: "p1", slot: 0 })!;
-    expect(surfaceItemsOn(s, "p1").map((p) => p.itemId)).toEqual(["candle"]);
-    expect(surfaceItemsOn(s, "p2")).toEqual([]);
-    expect(s.inventory.potion).toBe(2);
+  it("swaps places when moving one room item onto another", () => {
+    const before = placeFromTray(room, catalogWithPotion, setup(), "candle", { kind: "surface", hostUid: "p2", slot: 1 })!;
+    const onShelf = { kind: "surface", hostUid: "p1", slot: 0 } as const;
+    expect(dropKind(room, catalogWithPotion, before, "candle", onShelf, "p4")).toBe("swap");
+    const s = moveItem(room, catalogWithPotion, before, "p4", onShelf)!;
+    expect(surfaceItemsOn(s, "p1")).toEqual([{ uid: "p4", itemId: "candle", layer: "surface", hostUid: "p1", slot: 0 }]);
+    expect(surfaceItemsOn(s, "p2")).toEqual([{ uid: "p3", itemId: "potion", layer: "surface", hostUid: "p2", slot: 1 }]);
+    expect(s.inventory).toEqual(before.inventory);
+  });
+
+  it("swaps two items on the same table", () => {
+    let s = placeFromTray(room, catalogWithPotion, setup(), "candle", { kind: "surface", hostUid: "p2", slot: 0 })!;
+    s = placeFromTray(room, catalogWithPotion, s, "potion", { kind: "surface", hostUid: "p2", slot: 1 })!;
+    s = moveItem(room, catalogWithPotion, s, "p4", { kind: "surface", hostUid: "p2", slot: 1 })!;
+    expect(surfaceItemsOn(s, "p2").map((p) => [p.itemId, p.slot])).toEqual([
+      ["candle", 1],
+      ["potion", 0],
+    ]);
+  });
+
+  it("still sends the old item to the tray when the new one comes from the tray", () => {
+    expect(dropKind(room, catalogWithPotion, setup(), "candle", { kind: "surface", hostUid: "p1", slot: 0 })).toBe("replace");
   });
 
   it("treats dropping an item back on its own slot as a normal place", () => {

@@ -42,6 +42,7 @@ const COLOR_TRAY = 0x221d30;
 const COLOR_GRID_LINE = 0xffffff;
 const COLOR_OUTLINE = 0x1e1a2b;
 const COLOR_OK = 0x7bd389;
+const COLOR_SWAP = 0x6fa8dc;
 const COLOR_REPLACE = 0xe8b04a;
 const COLOR_BLOCKED = 0xe0625a;
 const TEXT_MUTED = "#a89cc8";
@@ -396,7 +397,7 @@ export class DecorateScene extends Phaser.Scene {
       const { x, y } = gridToWorld({ layer: def.layer, col: target.col, row: target.row });
       box = { x, y, w: def.width * TILE, h: def.height * TILE };
     }
-    const color = kind === "place" ? COLOR_OK : kind === "replace" ? COLOR_REPLACE : COLOR_BLOCKED;
+    const color = { place: COLOR_OK, swap: COLOR_SWAP, replace: COLOR_REPLACE, blocked: COLOR_BLOCKED }[kind];
     g.fillStyle(color, 0.3).fillRect(box.x, box.y, box.w, box.h);
     g.lineStyle(2, color, 0.9).strokeRect(box.x, box.y, box.w, box.h);
   }
