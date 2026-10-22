@@ -4,7 +4,7 @@ Oct 21, 2026 · @kxh
 
 ## Overview
 
-Witch's Cat Cottage is a short, cozy browser game: tidy a messy room in a witch's cottage, then decorate it to please the witch's cat. Cleaning is a brief warm-up; decorating is the main activity and the reward.
+Witch's Cat Cottage is a short, cozy browser game: tidy a messy room in a witch's cottage, then decorate it while the witch's cat keeps you company. Cleaning is a brief warm-up; decorating is the main activity and the reward. There are no wrong answers: the cat reacts to what you place, but never judges or scores it.
 
 - **Platform:** web first (desktop and phone browser). Wrap as a mobile app later only if v1 proves worth it.
 - **v1 goal:** find out whether the clean-then-decorate loop holds attention for 15 minutes. It is a learning project, not a commercial release.
@@ -12,32 +12,36 @@ Witch's Cat Cottage is a short, cozy browser game: tidy a messy room in a witch'
 
 ## Core loop
 
-One room takes about 5–10 minutes: a short clean, a longer decorate, then the cat's verdict.
+One room takes about 5–10 minutes: a short clean, then a longer decorate with the cat around.
 
 1. **Enter** a messy room.
 2. **Clean** (60–120 seconds): drag trash to the bin, return misplaced items to their spots.
 3. **Reward:** earn coins, scaled by how tidy and quick the clean was.
-4. **Decorate:** place, move, and remove items from your collection on the room grid.
-5. **Cat review:** tap Done. The cat walks the room and reacts to each item.
-6. **Payoff:** a cat-happiness score, bonus coins, and unlocks tied to what the cat liked. Move to the next room or keep rearranging.
+4. **Decorate:** place, move, and remove items from your collection on the room grid while the cat wanders the room and reacts to what you add.
+5. **Move on** to the next room whenever you like, or keep rearranging.
 
-## The cat: reactor system
+## The cat: a companion, not a judge
 
-The cat gives decorating a goal. Without it, decorating is an empty sandbox; with it, every placement is a small guess about what the cat will like.
+Decided Oct 21, 2026, after the milestone 2 playtest: a scored cat review made decorating feel like a puzzle with wrong answers, and didn't make Asa want to rearrange. The cat is now an ambient companion that lives in the room while you decorate.
 
-- **Tags:** every decor item has 1–3 tags, e.g. cozy, soft, warm, shiny, plant, spooky, fragile, tall.
-- **Preferences:** in v1 the cat has fixed likes and dislikes over those tags (for example, likes soft, warm, shiny; dislikes fragile items on high surfaces).
-- **Reactions:** liked item → the cat sits on it, naps, or purrs. Neutral → a sniff. Disliked → the cat knocks it over, and it lands on the floor where the player can put it back.
-- **Score:** cat happiness from 0 to 100, shown as hearts.
-- **Discoverability:** dislikes must be learnable, not punishing. The cat's reactions and short hint text teach its preferences over a few rooms.
-- **v1 behavior is scripted:** the cat walks a fixed path visiting items in order. No real pathfinding or AI in v1.
-- **v1 rules (decided Oct 21, 2026; all values live in `src/data/cat.ts` and `src/data/items.ts`):**
-  - Likes soft, warm, shiny. Dislikes fragile items "up high", which means on a shelf only (tables and stools are fine).
-  - Each item's reaction: dislike if a dislike rule matches; otherwise like if it has a liked tag; otherwise a neutral sniff.
-  - Score: +15 per liked item, −20 per disliked item, clamped to 0–100, shown as 5 hearts in half-heart steps.
-  - Visit order: left to right by item center; at the same spot, rugs, then floor, then low surfaces, then wall, then shelf items.
-  - Knocked-over items fall in the animation, then return to the tray (with anything on them).
-  - The cat is unnamed ("the cat") and its preferences are fixed in v1.
+- **Always there:** the cat is in the Decorate scene the whole time. It never blocks drops or gets in the way of dragging.
+- **No score, no wrong answers:** reactions are always positive, playful, or curious. Nothing is knocked off or sent back to the tray.
+- **Tags pick reactions:** every decor item has 1–3 tags (cozy, soft, warm, shiny, spooky, fragile, tall, …). Tags choose *which* reaction the cat does, not whether it approves.
+- **Behavior (scripted, no real AI or pathfinding in v1):**
+  - Idle: wanders, sits, grooms, or naps, drifting toward cozy spots (e.g. a rug or near the cauldron) when there are some.
+  - When an item is placed or moved, the cat finishes what it's doing, then after a short pause strolls over and reacts. Several new items are visited one at a time, at the cat's own pace.
+  - While the player drags something, the cat stops and turns to watch.
+  - Tapping the cat pets it: it purrs, a heart floats up, and it rolls over. A drag that starts on the cat still picks up the item underneath.
+  - If the item the cat is sitting on is removed or moved, the cat hops down, unbothered.
+- **Reactions (first match wins; values in `src/data/cat.ts`):**
+  - soft (rug): curls up and naps.
+  - shiny or fragile on a shelf: reaches up and paws at it; the item wobbles but stays put.
+  - warm (cauldron, candle): sits beside it and slow-blinks.
+  - shiny within reach: bats at it; the item wobbles.
+  - has a top (table, stool): hops up and loafs on it.
+  - spooky: ears perk, it stares.
+  - anything else: a curious sniff.
+- The cat is unnamed ("the cat") and its reactions are fixed in v1.
 
 ## Cleaning phase
 
@@ -70,9 +74,9 @@ Decorating is the core of the game, so it gets built and playtested first (see M
     - From the tray, or if a swap doesn't fit: the new item replaces what's there, and the replaced item goes back to the tray (amber highlight).
   - Dropping an item where it doesn't fit snaps it back to where it came from; the drop highlight shows green for a free spot and red where it doesn't fit.
 - **Controls:** drag from an inventory tray to place; drag to move; drag back to the tray to remove. Mouse and touch both work. No rotation in v1.
-- **Unlocks:** coins buy items in a simple shop. Items with tags the cat liked are revealed first, so the cat steers your collection.
+- **Unlocks:** coins buy items in a simple shop. How unlocks are chosen is decided at milestone 4 (the cat no longer scores rooms).
 - **Catalog size:** 25–30 decor items for v1.
-- **No fail state.** A low cat score just means fewer coins and hearts.
+- **No fail state and no score.**
 
 ## Scope
 
@@ -82,8 +86,8 @@ Anything not on the "In v1" list is out until v1 is playable end to end. Claude 
 | --- | --- |
 | 3 hand-authored rooms (bedroom, potion room, study) | Roguelike runs, procedural rooms |
 | 25–30 decor items | Multiple cats or cat customization |
-| One cat with fixed preferences | Story, dialogue, quests |
-| Clean → decorate → cat review loop | Item rotation, multi-tile wall art |
+| One ambient cat with fixed reactions | Story, dialogue, quests |
+| Clean → decorate loop, with the cat in the room | Item rotation, multi-tile wall art |
 | Coins and a simple shop | Accounts, cloud save, leaderboards |
 | Local save in the browser | Monetization, ads |
 | Mouse and touch drag | App store builds |
@@ -97,7 +101,7 @@ TypeScript, Phaser (current stable), and Vite, deployed as a static site so it c
 - **Tests:** those logic modules get unit tests (Vitest). Typecheck and tests must pass before any task is called done.
 - **Data-driven content.** Items, rooms, cat preferences, and prices live in data files, not inside scene code. Adding an item should mean editing data, not code.
 - **Art is swappable.** Every item is drawn by sprite id. A missing sprite falls back to a colored rectangle with the item's name.
-- **Scenes:** Boot, Clean, Decorate, CatReview, Shop.
+- **Scenes:** Boot, Clean, Decorate (with the cat), Shop.
 - **Save:** browser local storage, with a version number in the save format so later changes don't corrupt old saves.
 - **Hosting:** a free static host (GitHub Pages or itch.io) so each build can be tested on a phone.
 
@@ -121,7 +125,7 @@ Decorating is built before cleaning because it is the core of the game; if it is
 
 0. **Setup:** repo, Vite + Phaser + TypeScript, this file as CLAUDE.md, git, first deploy to a static host.
 1. **Decorate sandbox:** one room grid, 10 rectangle items, drag to place, move, and remove, local save. *Test: is arranging things satisfying on its own?*
-2. **Cat reactor:** tags, fixed preferences, scripted walk, reactions, happiness score. *Test: does the cat make you want to rearrange?*
+2. **Ambient cat:** tags, an always-present cat that wanders, reacts to new items, watches you drag, and can be petted. *Test: does having the cat around make decorating feel cozier and make you want to keep going?* (A first version with a scored review was tried and dropped; see "The cat".)
 3. **Cleaning phase:** 8–15 items before decorating, coin reward. *Test: does it feel like a warm-up or a chore?*
 4. **Progression:** shop, unlocks, all 3 rooms, 25–30 items.
 5. **Art pass:** bought cat sprite, Claude-made props in its palette.
@@ -150,7 +154,9 @@ These need Asa's decision; the first two block the art pass, the third blocks mi
 - [ ] Which cat sprite pack? It sets the palette and resolution for everything else.
 - [ ] Prop size: 16×16 or 32×32 pixels?
 - [x] Camera view: straight top-down (simplest) or a front-facing room view (prettier, harder)? → **Front-facing room view** (decided Oct 21, 2026).
-- [ ] Does the cat have a name and personality, and should its preferences ever change? → **Partly decided (Oct 21, 2026):** unnamed and fixed preferences in v1; revisit after playtesting.
+- [ ] Does the cat have a name and personality, and should its reactions ever change? → **Partly decided (Oct 21, 2026):** unnamed with fixed reactions in v1; revisit after playtesting.
+- [ ] Should there be a gentle goal, such as a "cat moments" journal collecting the reactions you've discovered? Decide after the ambient-cat playtest.
+- [ ] Without a cat score, what drives coins and unlocks beyond cleaning? Decide at milestone 4.
 - [x] Hosting: GitHub Pages or itch.io? → **GitHub Pages** (decided Oct 21, 2026). Every push to `main` deploys automatically.
 
 ## Project commands
