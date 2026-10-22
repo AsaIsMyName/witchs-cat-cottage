@@ -1,5 +1,22 @@
 # Status
 
+## Oct 21, 2026 — Milestone 2: Cat reactor (built, awaiting playtest)
+
+Different-size swap playtest: passed. Milestone 1 closed.
+
+**Done**
+- Tags on all 10 items; cat likes soft, warm, shiny and dislikes fragile items on shelves (rules in CLAUDE.md, values in `src/data/cat.ts`).
+- Review logic in `src/logic/cat.ts`: reactions, left-to-right visit order, score (+15 like, −20 dislike, 0–100), knockovers back to the tray. 92 unit tests pass.
+- "▶ show the cat" button opens the CatReview scene: the placeholder cat walks the room, hops and shows a heart for likes, sniffs neutral items, and knocks disliked items to the floor with a hint line. Ends with hearts, a summary, and "◀ keep decorating". "speed up ▶▶" fast-forwards.
+- Room drawing shared between scenes (`room-view.ts`, `room-store.ts`).
+
+**Not verified**
+- The review animation hasn't run in a real browser yet (automated browser testing doesn't work on this machine). Asa's phone playtest is its first run.
+
+**Next**
+- Asa playtests. Go/no-go question: *does the cat make you want to rearrange?*
+- Tune scores and hint text from feedback.
+
 ## Oct 21, 2026 — Swaps between different sizes (awaiting playtest)
 
 Same-footprint swap playtest: passed.

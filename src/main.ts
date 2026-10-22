@@ -1,6 +1,8 @@
 import * as Phaser from "phaser";
 import { BootScene } from "./scenes/BootScene";
-import { DecorateScene, GAME_HEIGHT, GAME_WIDTH } from "./scenes/DecorateScene";
+import { CatReviewScene } from "./scenes/CatReviewScene";
+import { DecorateScene } from "./scenes/DecorateScene";
+import { GAME_HEIGHT, GAME_WIDTH } from "./scenes/room-view";
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -13,5 +15,5 @@ new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, DecorateScene],
+  scene: [BootScene, DecorateScene, CatReviewScene],
 });

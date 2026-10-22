@@ -1,142 +1,50 @@
 import * as Phaser from "phaser";
-import { CATALOG, ITEMS, STARTING_INVENTORY, type ItemDef } from "../data/items";
-import { BEDROOM, ROOMS } from "../data/rooms";
+import { CATALOG, ITEMS, type ItemDef } from "../data/items";
+import { BEDROOM } from "../data/rooms";
 import {
   clearRoom,
-  emptyRoom,
-  isValidState,
   moveItem,
   placeFromTray,
   planDrop,
   removeToTray,
   surfaceItemsOn,
-  type GridLayer,
-  type GridPlacement,
   type RoomState,
   type Target,
 } from "../logic/grid";
-import { SAVE_VERSION, loadSave, writeSave, type KeyValueStore } from "../logic/save";
+import { loadRoom, saveRoom } from "./room-store";
+import {
+  DEPTH_FLOOR,
+  FLOOR_Y,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  ItemView,
+  ROOM_X,
+  SURFACE_ITEM_H,
+  TEXT_LIGHT,
+  TEXT_MUTED,
+  TILE,
+  TRAY_Y,
+  WALL_Y,
+  drawRoom,
+  gridToWorld,
+  layoutPlacements,
+  textStyle,
+  visualBox,
+  type Box,
+} from "./room-view";
 
-export const GAME_WIDTH = 768;
-export const GAME_HEIGHT = 432;
-
-const TILE = 48;
-const ROOM_X = (GAME_WIDTH - BEDROOM.columns * TILE) / 2;
-const WALL_Y = 16;
-const FLOOR_Y = WALL_Y + BEDROOM.wallRows * TILE;
-const ROOM_BOTTOM = FLOOR_Y + BEDROOM.floorRows * TILE;
-const TRAY_Y = ROOM_BOTTOM + 12;
-const TRAY_ITEM_BOTTOM = TRAY_Y + 64;
+const TRAY_ITEM_BOTTOM = TRAY_Y + 72;
 const TRAY_GAP = 12;
-const SURFACE_ITEM_W = 24;
-const SURFACE_ITEM_H = 22;
-
-const DEPTH_WALL = 10;
-const DEPTH_RUG = 50;
-const DEPTH_FLOOR = 100;
 const DEPTH_DRAGGING = 1000;
 
-const COLOR_WALL = 0x3d3357;
-const COLOR_FLOOR = 0x5a4632;
-const COLOR_TRAY = 0x221d30;
-const COLOR_GRID_LINE = 0xffffff;
-const COLOR_OUTLINE = 0x1e1a2b;
 const COLOR_OK = 0x7bd389;
 const COLOR_SWAP = 0x6fa8dc;
 const COLOR_REPLACE = 0xe8b04a;
 const COLOR_BLOCKED = 0xe0625a;
-const TEXT_MUTED = "#a89cc8";
 const TEXT_WARNING = "#e0625a";
 const RESET_CONFIRM_MS = 3000;
 
-const SAVE_KEY = "witchs-cat-cottage/save";
-
 type DragSource = { kind: "tray"; itemId: string } | { kind: "placed"; uid: string };
-
-interface Box {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-/** Where an item's visible rectangle sits inside its footprint. */
-function visualBox(def: ItemDef): Box {
-  if (def.layer === "surface") return { x: 0, y: 0, w: SURFACE_ITEM_W, h: SURFACE_ITEM_H };
-  const w = def.width * TILE;
-  const h = def.height * TILE;
-  if (def.layer === "wall" && def.visualHeight === undefined) return { x: 3, y: 3, w: w - 6, h: h - 6 };
-  const visibleH = Math.round(h * (def.visualHeight ?? 0.9));
-  return { x: 3, y: h - visibleH, w: w - 6, h: visibleH };
-}
-
-function gridToWorld(p: { layer: GridLayer; col: number; row: number }): { x: number; y: number } {
-  return { x: ROOM_X + p.col * TILE, y: (p.layer === "wall" ? WALL_Y : FLOOR_Y) + p.row * TILE };
-}
-
-/** One item on screen: a labeled rectangle, or its sprite once one exists. Positioned by footprint top-left. */
-class ItemView {
-  readonly body: Phaser.GameObjects.Rectangle;
-  private readonly sprite?: Phaser.GameObjects.Image;
-  private readonly label?: Phaser.GameObjects.Text;
-  private readonly box: Box;
-  x = 0;
-  y = 0;
-
-  constructor(scene: Phaser.Scene, readonly def: ItemDef) {
-    this.box = visualBox(def);
-    const hasSprite = scene.textures.exists(def.spriteId);
-    this.body = scene.add.rectangle(0, 0, this.box.w, this.box.h, def.color, hasSprite ? 0 : 1).setOrigin(0);
-    if (hasSprite) {
-      this.sprite = scene.add.image(0, 0, def.spriteId).setOrigin(0).setDisplaySize(this.box.w, this.box.h);
-    } else {
-      this.body.setStrokeStyle(2, COLOR_OUTLINE);
-      this.label = scene.add
-        .text(0, 0, def.name, {
-          fontFamily: "monospace",
-          fontSize: "9px",
-          color: "#f3e6c4",
-          stroke: "#1e1a2b",
-          strokeThickness: 3,
-          align: "center",
-          wordWrap: { width: Math.max(this.box.w, TILE) },
-          resolution: 2,
-        })
-        .setOrigin(0.5);
-    }
-  }
-
-  setPosition(x: number, y: number): void {
-    this.x = x;
-    this.y = y;
-    const { box } = this;
-    this.body.setPosition(x + box.x, y + box.y);
-    this.sprite?.setPosition(x + box.x, y + box.y);
-    this.label?.setPosition(x + box.x + box.w / 2, y + box.y + box.h / 2);
-  }
-
-  setDepth(depth: number): void {
-    this.body.setDepth(depth);
-    this.sprite?.setDepth(depth);
-    this.label?.setDepth(depth + 0.5);
-  }
-
-  /** Width of the item in the tray (its footprint, or its visual size for surface items). */
-  get trayWidth(): number {
-    return this.def.layer === "surface" ? this.box.w : this.def.width * TILE;
-  }
-
-  /** Footprint y that puts the item's visible bottom at `bottom`. */
-  footprintYForBottom(bottom: number): number {
-    return bottom - (this.box.y + this.box.h);
-  }
-
-  destroy(): void {
-    this.body.destroy();
-    this.sprite?.destroy();
-    this.label?.destroy();
-  }
-}
 
 interface Drag {
   view: ItemView;
@@ -149,7 +57,7 @@ interface Drag {
 export class DecorateScene extends Phaser.Scene {
   private state!: RoomState;
   private readonly views: ItemView[] = [];
-  private readonly placedViews = new Map<string, ItemView>();
+  private placedViews = new Map<string, ItemView>();
   private readonly sources = new Map<Phaser.GameObjects.GameObject, { view: ItemView; source: DragSource }>();
   private trayLabels: Phaser.GameObjects.Text[] = [];
   private highlight!: Phaser.GameObjects.Graphics;
@@ -162,25 +70,37 @@ export class DecorateScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.state = this.loadRoom();
-    this.drawRoom();
+    // Scenes are reused when restarted, so clear anything left from the last visit.
+    this.views.length = 0;
+    this.sources.clear();
+    this.trayLabels = [];
+    this.drag = undefined;
+    this.resetConfirmTimer = undefined;
+
+    this.state = loadRoom();
+    drawRoom(this);
     this.highlight = this.add.graphics().setDepth(DEPTH_DRAGGING - 1);
     this.input.dragDistanceThreshold = 4;
     this.input.on("dragstart", this.onDragStart, this);
     this.input.on("drag", this.onDrag, this);
     this.input.on("dragend", this.onDragEnd, this);
+    this.addDoneButton();
     this.addResetButton();
     this.renderItems();
   }
 
+  private addDoneButton(): void {
+    this.add
+      .text(10, TRAY_Y + 4, "▶ show the cat", textStyle(10, TEXT_LIGHT))
+      .setPadding(6, 4, 6, 4)
+      .setBackgroundColor("#3d3357")
+      .setInteractive({ useHandCursor: true })
+      .on("pointerup", () => this.scene.start("CatReview"));
+  }
+
   private addResetButton(): void {
     this.resetButton = this.add
-      .text(GAME_WIDTH - 10, TRAY_Y + 4, "reset room", {
-        fontFamily: "monospace",
-        fontSize: "10px",
-        color: TEXT_MUTED,
-        resolution: 2,
-      })
+      .text(GAME_WIDTH - 10, TRAY_Y + 4, "reset room", textStyle(10, TEXT_MUTED))
       .setOrigin(1, 0)
       .setPadding(6, 4, 6, 4)
       .setInteractive({ useHandCursor: true });
@@ -196,7 +116,7 @@ export class DecorateScene extends Phaser.Scene {
     }
     this.cancelReset();
     this.state = clearRoom(this.state);
-    this.saveRoom();
+    saveRoom(this.state);
     this.renderItems();
   }
 
@@ -206,45 +126,15 @@ export class DecorateScene extends Phaser.Scene {
     this.resetButton.setText("reset room").setColor(TEXT_MUTED);
   }
 
-  private drawRoom(): void {
-    const g = this.add.graphics();
-    const roomW = BEDROOM.columns * TILE;
-    g.fillStyle(COLOR_WALL).fillRect(ROOM_X, WALL_Y, roomW, FLOOR_Y - WALL_Y);
-    g.fillStyle(COLOR_FLOOR).fillRect(ROOM_X, FLOOR_Y, roomW, ROOM_BOTTOM - FLOOR_Y);
-    g.lineStyle(1, COLOR_GRID_LINE, 0.08);
-    for (let c = 1; c < BEDROOM.columns; c++) g.lineBetween(ROOM_X + c * TILE, WALL_Y, ROOM_X + c * TILE, ROOM_BOTTOM);
-    for (let y = WALL_Y + TILE; y < ROOM_BOTTOM; y += TILE) g.lineBetween(ROOM_X, y, ROOM_X + roomW, y);
-    g.lineStyle(2, COLOR_OUTLINE).strokeRect(ROOM_X, WALL_Y, roomW, ROOM_BOTTOM - WALL_Y);
-    g.fillStyle(COLOR_TRAY).fillRect(0, TRAY_Y, GAME_WIDTH, GAME_HEIGHT - TRAY_Y);
-  }
-
   /** Rebuilds every item view from `state`. Cheap at this item count, and keeps the screen in sync with the logic. */
   private renderItems(): void {
     for (const view of this.views) view.destroy();
     for (const label of this.trayLabels) label.destroy();
     this.views.length = 0;
     this.trayLabels = [];
-    this.placedViews.clear();
     this.sources.clear();
 
-    for (const p of this.state.placements) {
-      if (p.layer === "surface") continue;
-      const view = this.addView(CATALOG[p.itemId], { kind: "placed", uid: p.uid });
-      const { x, y } = gridToWorld(p);
-      view.setPosition(x, y);
-      view.setDepth(this.depthOf(p));
-      this.placedViews.set(p.uid, view);
-    }
-    for (const p of this.state.placements) {
-      if (p.layer !== "surface") continue;
-      const host = this.placedViews.get(p.hostUid);
-      if (!host) continue;
-      const view = this.addView(CATALOG[p.itemId], { kind: "placed", uid: p.uid });
-      const pos = this.surfaceSlotPosition(host, p.slot);
-      view.setPosition(pos.x, pos.y);
-      view.setDepth(host.body.depth + 2);
-      this.placedViews.set(p.uid, view);
-    }
+    this.placedViews = layoutPlacements(this.state, (def, uid) => this.addView(def, { kind: "placed", uid }));
 
     const trayItems = ITEMS.filter((item) => (this.state.inventory[item.id] ?? 0) > 0);
     const trayViews = trayItems.map((item) => this.addView(item, { kind: "tray", itemId: item.id }));
@@ -256,14 +146,7 @@ export class DecorateScene extends Phaser.Scene {
       const count = this.state.inventory[view.def.id] ?? 0;
       if (count > 1) {
         this.trayLabels.push(
-          this.add
-            .text(x + view.trayWidth / 2, TRAY_ITEM_BOTTOM + 6, `×${count}`, {
-              fontFamily: "monospace",
-              fontSize: "10px",
-              color: TEXT_MUTED,
-              resolution: 2,
-            })
-            .setOrigin(0.5, 0),
+          this.add.text(x + view.trayWidth / 2, TRAY_ITEM_BOTTOM + 6, `×${count}`, textStyle(10, TEXT_MUTED)).setOrigin(0.5, 0),
         );
       }
       x += view.trayWidth + TRAY_GAP;
@@ -277,19 +160,6 @@ export class DecorateScene extends Phaser.Scene {
     this.sources.set(view.body, { view, source });
     this.views.push(view);
     return view;
-  }
-
-  private depthOf(p: GridPlacement): number {
-    // Rugs always draw under furniture. Floor items closer to the front (higher row) draw on top.
-    if (p.layer === "wall") return DEPTH_WALL;
-    if (p.layer === "rug") return DEPTH_RUG + p.row;
-    return DEPTH_FLOOR + (p.row + CATALOG[p.itemId].height - 1) * 10;
-  }
-
-  /** Footprint top-left for a surface item in `slot` on the host view. */
-  private surfaceSlotPosition(host: ItemView, slot: number): { x: number; y: number } {
-    const hostTop = host.y + visualBox(host.def).y;
-    return { x: host.x + slot * TILE + (TILE - SURFACE_ITEM_W) / 2, y: hostTop - SURFACE_ITEM_H };
   }
 
   private onDragStart(pointer: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject): void {
@@ -338,7 +208,7 @@ export class DecorateScene extends Phaser.Scene {
     }
     if (next) {
       this.state = next;
-      this.saveRoom();
+      saveRoom(this.state);
     }
     // Re-render either way: a refused drop snaps back to where it came from.
     this.renderItems();
@@ -402,31 +272,10 @@ export class DecorateScene extends Phaser.Scene {
     if (target.kind === "surface") {
       const host = this.placedViews.get(target.hostUid);
       if (!host) return null;
-      const top = host.y + visualBox(host.def).y;
-      return { x: host.x + target.slot * TILE, y: top - SURFACE_ITEM_H - 2, w: TILE, h: SURFACE_ITEM_H + 2 };
+      return { x: host.x + target.slot * TILE, y: host.top - SURFACE_ITEM_H - 2, w: TILE, h: SURFACE_ITEM_H + 2 };
     }
     if (def.layer === "surface") return null;
     const { x, y } = gridToWorld({ layer: def.layer, col: target.col, row: target.row });
     return { x, y, w: def.width * TILE, h: def.height * TILE };
-  }
-
-  private loadRoom(): RoomState {
-    const save = loadSave(storage(), SAVE_KEY, (roomId, state) => {
-      const room = ROOMS[roomId];
-      return room !== undefined && isValidState(room, CATALOG, state);
-    });
-    return save?.rooms[BEDROOM.id] ?? emptyRoom(STARTING_INVENTORY);
-  }
-
-  private saveRoom(): void {
-    writeSave(storage(), SAVE_KEY, { version: SAVE_VERSION, rooms: { [BEDROOM.id]: this.state } });
-  }
-}
-
-function storage(): KeyValueStore | null {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
   }
 }
