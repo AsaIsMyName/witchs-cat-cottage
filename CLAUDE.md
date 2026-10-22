@@ -54,7 +54,8 @@ Decorating is the core of the game, so it gets built and playtested first (see M
   - Some furniture has a top with one surface slot per tile of width (a 2×1 table has 2 slots). Shelves are 1×1 wall items with 1 slot. Rugs, the cauldron, and other wall items have no top.
   - Surface items (candles, potions, plants) take one slot and can only sit on a surface.
   - Moving furniture moves whatever sits on it. Removing furniture sends whatever sits on it back to the tray.
-  - Dropping an item where it doesn't fit snaps it back to where it came from; the drop highlight shows red while hovering there.
+  - Dropping a surface item (from the tray or another slot) onto an occupied slot replaces what's there, and the replaced item goes back to the tray. The drop highlight shows amber for a replace.
+  - Dropping an item where it doesn't fit snaps it back to where it came from; the drop highlight shows green for a free spot and red where it doesn't fit.
 - **Controls:** drag from an inventory tray to place; drag to move; drag back to the tray to remove. Mouse and touch both work. No rotation in v1.
 - **Unlocks:** coins buy items in a simple shop. Items with tags the cat liked are revealed first, so the cat steers your collection.
 - **Catalog size:** 25–30 decor items for v1.
@@ -98,6 +99,8 @@ Art is the biggest risk in a decorating game, so it is decoupled from code and d
 5. **Optional:** touch up weak sprites in Aseprite (about $20).
 
 Style rules: one shared palette file, one outline color, light from the top-left, integer scaling only, no smoothing. Never mix Claude-made props with a pack in a different style.
+
+Visibility rule: a rug must stay visible under furniture (e.g. its edges or back show around a table's legs). With placeholder rectangles a table fully covers a rug; the art pass must fix that.
 
 ## Milestones
 

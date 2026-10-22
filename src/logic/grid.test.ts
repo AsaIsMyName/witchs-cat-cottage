@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canPlace,
   clearRoom,
+  dropKind,
   emptyRoom,
   isValidState,
   moveItem,
@@ -116,6 +117,49 @@ describe("surfaces", () => {
     expect(canPlace(room, catalog, s, "candle", { kind: "surface", hostUid: "p1", slot: 1 })).toBe(false);
     const moved = moveItem(room, catalog, s, "p1", { kind: "grid", col: 7, row: 0 });
     expect(moved && surfaceItemsOn(moved, "p1")).toHaveLength(1);
+  });
+});
+
+describe("replacing surface items", () => {
+  const catalogWithPotion: Catalog = { ...catalog, potion: { id: "potion", layer: "surface", width: 1, height: 1 } };
+  const setup = () => {
+    let s = emptyRoom({ shelf: 1, table: 1, candle: 1, potion: 2 });
+    s = placeFromTray(room, catalogWithPotion, s, "shelf", { kind: "grid", col: 0, row: 0 })!;
+    s = placeFromTray(room, catalogWithPotion, s, "table", { kind: "grid", col: 0, row: 0 })!;
+    return placeFromTray(room, catalogWithPotion, s, "potion", { kind: "surface", hostUid: "p1", slot: 0 })!;
+  };
+
+  it("reports a drop on an occupied slot as a replace", () => {
+    const s = setup();
+    expect(dropKind(room, catalogWithPotion, s, "candle", { kind: "surface", hostUid: "p1", slot: 0 })).toBe("replace");
+    expect(dropKind(room, catalogWithPotion, s, "candle", { kind: "surface", hostUid: "p2", slot: 0 })).toBe("place");
+    expect(dropKind(room, catalogWithPotion, s, "candle", { kind: "surface", hostUid: "p1", slot: 1 })).toBe("blocked");
+  });
+
+  it("swaps a tray item in and sends the old one to the tray", () => {
+    const s = placeFromTray(room, catalogWithPotion, setup(), "candle", { kind: "surface", hostUid: "p1", slot: 0 });
+    expect(s && surfaceItemsOn(s, "p1").map((p) => p.itemId)).toEqual(["candle"]);
+    expect(s?.inventory).toMatchObject({ candle: 0, potion: 2 });
+  });
+
+  it("swaps in the same kind of item without changing the tray count", () => {
+    const s = placeFromTray(room, catalogWithPotion, setup(), "potion", { kind: "surface", hostUid: "p1", slot: 0 });
+    expect(s && surfaceItemsOn(s, "p1")).toHaveLength(1);
+    expect(s?.inventory.potion).toBe(1);
+  });
+
+  it("sends the old item to the tray when moving onto an occupied slot", () => {
+    let s = placeFromTray(room, catalogWithPotion, setup(), "candle", { kind: "surface", hostUid: "p2", slot: 1 })!;
+    s = moveItem(room, catalogWithPotion, s, "p4", { kind: "surface", hostUid: "p1", slot: 0 })!;
+    expect(surfaceItemsOn(s, "p1").map((p) => p.itemId)).toEqual(["candle"]);
+    expect(surfaceItemsOn(s, "p2")).toEqual([]);
+    expect(s.inventory.potion).toBe(2);
+  });
+
+  it("treats dropping an item back on its own slot as a normal place", () => {
+    const s = setup();
+    expect(dropKind(room, catalogWithPotion, s, "potion", { kind: "surface", hostUid: "p1", slot: 0 }, "p3")).toBe("place");
+    expect(moveItem(room, catalogWithPotion, s, "p3", { kind: "surface", hostUid: "p1", slot: 0 })).toEqual(s);
   });
 });
 

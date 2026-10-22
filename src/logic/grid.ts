@@ -97,7 +97,26 @@ export function canPlace(
   });
 }
 
-/** Place an item from the tray. Returns the new state, or null if it doesn't fit or none are left. */
+/**
+ * What a drop at `target` would do. "replace" means it lands on an occupied surface slot,
+ * and the item already there goes back to the tray.
+ */
+export type DropKind = "place" | "replace" | "blocked";
+
+export function dropKind(
+  room: RoomShape,
+  catalog: Catalog,
+  state: RoomState,
+  itemId: string,
+  target: Target,
+  ignoreUid?: string,
+): DropKind {
+  if (canPlace(room, catalog, state, itemId, target, ignoreUid)) return "place";
+  const cleared = clearSlot(state, target, ignoreUid);
+  return cleared !== state && canPlace(room, catalog, cleared, itemId, target, ignoreUid) ? "replace" : "blocked";
+}
+
+/** Place an item from the tray, replacing a surface item if needed. Returns null if it doesn't fit or none are left. */
 export function placeFromTray(
   room: RoomShape,
   catalog: Catalog,
@@ -105,17 +124,20 @@ export function placeFromTray(
   itemId: string,
   target: Target,
 ): RoomState | null {
-  const count = state.inventory[itemId] ?? 0;
-  if (count <= 0 || !canPlace(room, catalog, state, itemId, target)) return null;
-  const uid = `p${state.nextUid}`;
+  if ((state.inventory[itemId] ?? 0) <= 0 || dropKind(room, catalog, state, itemId, target) === "blocked") return null;
+  const base = clearSlot(state, target);
+  const uid = `p${base.nextUid}`;
   return {
-    placements: [...state.placements, toPlacement(uid, itemId, catalog[itemId].layer, target)],
-    inventory: { ...state.inventory, [itemId]: count - 1 },
-    nextUid: state.nextUid + 1,
+    placements: [...base.placements, toPlacement(uid, itemId, catalog[itemId].layer, target)],
+    inventory: { ...base.inventory, [itemId]: (base.inventory[itemId] ?? 0) - 1 },
+    nextUid: base.nextUid + 1,
   };
 }
 
-/** Move a placed item. Anything on top of a moved floor item stays on it. Returns null if it doesn't fit. */
+/**
+ * Move a placed item, replacing a surface item if needed. Anything on top of a moved item stays on it.
+ * Returns null if it doesn't fit.
+ */
 export function moveItem(
   room: RoomShape,
   catalog: Catalog,
@@ -124,9 +146,10 @@ export function moveItem(
   target: Target,
 ): RoomState | null {
   const current = state.placements.find((p) => p.uid === uid);
-  if (!current || !canPlace(room, catalog, state, current.itemId, target, uid)) return null;
+  if (!current || dropKind(room, catalog, state, current.itemId, target, uid) === "blocked") return null;
+  const base = clearSlot(state, target, uid);
   const moved = toPlacement(uid, current.itemId, current.layer, target);
-  return { ...state, placements: state.placements.map((p) => (p.uid === uid ? moved : p)) };
+  return { ...base, placements: base.placements.map((p) => (p.uid === uid ? moved : p)) };
 }
 
 /** Put a placed item back in the tray, along with anything sitting on it. */
@@ -170,6 +193,13 @@ export function targetOf(p: Placement): Target {
   return p.layer === "surface"
     ? { kind: "surface", hostUid: p.hostUid, slot: p.slot }
     : { kind: "grid", col: p.col, row: p.row };
+}
+
+/** Sends whatever sits in a surface target's slot (other than `ignoreUid`) back to the tray. */
+function clearSlot(state: RoomState, target: Target, ignoreUid?: string): RoomState {
+  if (target.kind !== "surface") return state;
+  const occupant = surfaceItemsOn(state, target.hostUid).find((p) => p.slot === target.slot && p.uid !== ignoreUid);
+  return occupant ? removeToTray(state, occupant.uid) : state;
 }
 
 function toPlacement(uid: string, itemId: string, layer: Layer, target: Target): Placement {

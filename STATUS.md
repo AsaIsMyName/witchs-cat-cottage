@@ -1,6 +1,18 @@
 # Status
 
-## Oct 21, 2026 — Milestone 1 follow-up: finer control (awaiting playtest)
+## Oct 21, 2026 — Surface swapping (awaiting playtest)
+
+Rugs, shelves, and reset playtest: passed. Placeholder tables fully hide rugs; Asa accepted that for now, and CLAUDE.md now requires the art pass to keep rugs visible.
+
+**Done**
+- Dropping a candle or potion on an occupied shelf or table slot replaces what's there; the old item goes back to the tray. Works from the tray and when moving from another slot. Amber highlight means "will replace".
+- 59 unit tests pass. Save format unchanged.
+
+**Next**
+- Asa playtests swapping on a phone.
+- Then milestone 2: cat reactor.
+
+## Oct 21, 2026 — Milestone 1 follow-up: finer control
 
 Milestone 1 playtest: **go.** Arranging is satisfying; Asa asked for finer control.
 
