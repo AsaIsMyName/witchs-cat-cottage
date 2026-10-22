@@ -7,6 +7,7 @@ import {
   isValidState,
   moveItem,
   placeFromTray,
+  placementsNotIn,
   planDrop,
   removeToTray,
   surfaceItemsOn,
@@ -392,6 +393,34 @@ describe("clearRoom", () => {
     s = clearRoom(s);
     expect(s.placements).toEqual([]);
     expect(s.inventory).toEqual(start().inventory);
+  });
+});
+
+describe("placementsNotIn", () => {
+  it("lists what was removed one way and what was added the other", () => {
+    let prev = place(start(), "table", { kind: "grid", col: 0, row: 0 });
+    prev = place(prev, "candle", { kind: "surface", hostUid: "p1", slot: 0 });
+    prev = place(prev, "frame", { kind: "grid", col: 0, row: 0 });
+    let next = removeToTray(prev, "p1");
+    next = place(next, "rug", { kind: "grid", col: 4, row: 0 });
+    expect(placementsNotIn(prev, next).map((p) => p.uid)).toEqual(["p1", "p2"]);
+    expect(placementsNotIn(next, prev).map((p) => p.itemId)).toEqual(["rug"]);
+  });
+
+  it("ignores moves and swaps", () => {
+    const prev = place(start(), "table", { kind: "grid", col: 0, row: 0 });
+    const next = moveItem(room, catalog, prev, "p1", { kind: "grid", col: 4, row: 1 });
+    expect(next).not.toBeNull();
+    expect(placementsNotIn(prev, next!)).toEqual([]);
+    expect(placementsNotIn(next!, prev)).toEqual([]);
+  });
+
+  it("finds the item an amber replace sends back", () => {
+    let prev = place(start(), "table", { kind: "grid", col: 0, row: 0 });
+    prev = place(prev, "candle", { kind: "surface", hostUid: "p1", slot: 0 });
+    const next = place(prev, "candle", { kind: "surface", hostUid: "p1", slot: 0 });
+    expect(placementsNotIn(prev, next).map((p) => p.uid)).toEqual(["p2"]);
+    expect(placementsNotIn(next, prev).map((p) => p.uid)).toEqual(["p3"]);
   });
 });
 

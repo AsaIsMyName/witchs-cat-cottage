@@ -200,6 +200,15 @@ export function clearRoom(state: RoomState): RoomState {
   return { ...state, placements: [], inventory };
 }
 
+/**
+ * Placements in `a` whose uid isn't in `b`. With (prev, next) that's what went back to the tray;
+ * with (next, prev) it's what was newly placed.
+ */
+export function placementsNotIn(a: RoomState, b: RoomState): Placement[] {
+  const uids = new Set(b.placements.map((p) => p.uid));
+  return a.placements.filter((p) => !uids.has(p.uid));
+}
+
 export function surfaceItemsOn(state: RoomState, hostUid: string): SurfacePlacement[] {
   return state.placements.filter((p): p is SurfacePlacement => p.layer === "surface" && p.hostUid === hostUid);
 }

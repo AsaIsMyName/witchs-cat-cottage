@@ -1,5 +1,33 @@
 # Status
 
+## Oct 22, 2026 — Milestone 3a: spellbook inventory and portal effects (awaiting playtest)
+
+**Done**
+- The tray is drawn as an open spellbook: an amber-trimmed cover, two page panels, a dark spine down the middle, and a small "magic inventory" heading. Item layout, `TRAY_Y`, and the drop-to-remove area are unchanged. "reset room" moved a few px (to x −14, y +6) so it sits inside the right page, level with the heading. The green outline when dragging back over the book stays.
+- Summon: dragging from the book opens a two-ring portal at the item's book spot that fades and shrinks out (~280ms), and the item pops from 0.85 to full size over 120ms.
+- Land: a successful place or move (including swaps and amber replaces) throws six small four-point stars out from the dragged item's final spot (~360ms).
+- Send back: anything that leaves the room spins and shrinks into a small swirl (~360ms): an item dragged to the book, surface items riding on removed furniture, the item an amber replace sends back, and everything on "reset room". The ghost is a separate copy, so it outlives the re-render. It starts where the item's view last was (for a drag to the book, that's where it was dropped).
+- A refused drop still just snaps back, with no effect.
+- New `src/scenes/magic-fx.ts` (`openPortal`, `popIn`, `sparkle`, `sendBack`) and `src/data/magic.ts` (`MAGIC_FX`: durations, sizes, colors, counts). Every effect object is destroyed when its tween completes.
+- `ItemView.setScale` scales only what's drawn, around the visual center. The view's x/y (which `targetFor` reads) never change, so drop math is untouched. The pop is guarded so a drop mid-pop is harmless.
+- Ghosts are built by `itemGhost` in `room-view.ts`: not interactive, not in `placedViews`, so the cat never sees them.
+- New pure helper `placementsNotIn` in `src/logic/grid.ts` (tested): what went back (prev vs next) and what was newly placed (next vs prev).
+- 110 unit tests pass. Save format unchanged. CLAUDE.md unchanged (matches "Magic inventory and portals").
+
+**Not verified**
+- Not run in a real browser; `npm run check` can't check visuals or feel. Asa, please re-test locally and on a phone:
+  - Does the book read as a spellbook, and are all item labels, ×N counts, the heading, and "reset room" readable? (The spine runs through the middle of the item row.)
+  - Drag from the book: does the item stick to your finger from the first frame, with no lag? Is the portal ring visible behind it?
+  - Drop a tray item, move an item, and swap two items: one small sparkle on the dragged item each time?
+  - Drag the table (with a candle on it) to the book: do both spin away? Amber replace a candle: does the old one spin away?
+  - "reset room" with a full room: does everything swirl away at once without a stutter on the phone?
+  - Refused drop (red): snaps back, no effect.
+  - The cat behaves exactly as before, and ignores the ghosts.
+
+**Next**
+- Asa playtests 3a on a phone.
+- Then task 3b: the cat's portal moment.
+
 ## Oct 22, 2026 — Direction change: magic theme, decorate above all
 
 Asa redirected the game; CLAUDE.md is rewritten to match. No code changed.

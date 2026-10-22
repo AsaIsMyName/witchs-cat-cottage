@@ -26,6 +26,11 @@ const COLOR_FLOOR = 0x5a4632;
 const COLOR_TRAY = 0x221d30;
 const COLOR_GRID_LINE = 0xffffff;
 const COLOR_OUTLINE = 0x1e1a2b;
+const COLOR_BOOK_COVER = 0x2b1f33;
+const COLOR_BOOK_PAGE = 0x342a48;
+const COLOR_BOOK_SPINE = 0x1a1322;
+const COLOR_BOOK_TRIM = 0xc9973f;
+const SPINE_HALF_W = 5;
 export const TEXT_LIGHT = "#f3e6c4";
 export const TEXT_MUTED = "#a89cc8";
 export const TEXT_OUTLINE = "#1e1a2b";
@@ -64,6 +69,7 @@ export class ItemView {
   readonly box: Box;
   x = 0;
   y = 0;
+  private scale = 1;
 
   constructor(scene: Phaser.Scene, readonly def: ItemDef) {
     this.box = visualBox(def);
@@ -88,10 +94,27 @@ export class ItemView {
   setPosition(x: number, y: number): void {
     this.x = x;
     this.y = y;
-    const { box } = this;
-    this.body.setPosition(x + box.x, y + box.y);
-    this.sprite?.setPosition(x + box.x, y + box.y);
+    const { box, scale } = this;
+    // A scaled item shrinks toward its visual center; x and y stay the footprint top-left.
+    const left = x + box.x + (box.w * (1 - scale)) / 2;
+    const top = y + box.y + (box.h * (1 - scale)) / 2;
+    this.body.setPosition(left, top);
+    this.sprite?.setPosition(left, top);
     this.label?.setPosition(x + box.x + box.w / 2, y + box.y + box.h / 2);
+  }
+
+  /** Scales what's drawn around its center, for small pops. Doesn't change x, y, or the footprint. */
+  setScale(scale: number): void {
+    this.scale = scale;
+    this.body.setScale(scale);
+    this.sprite?.setDisplaySize(this.box.w * scale, this.box.h * scale);
+    this.label?.setScale(scale);
+    this.setPosition(this.x, this.y);
+  }
+
+  /** Whether the view still exists, i.e. hasn't been destroyed by a re-render. */
+  get alive(): boolean {
+    return this.body.active;
   }
 
   setDepth(depth: number): void {
@@ -133,6 +156,32 @@ export class ItemView {
   }
 }
 
+/**
+ * A copy of `view`'s look as one container centered on the visible item, so it can spin and
+ * shrink. Not interactive and not an item view: the scene and the cat never see it.
+ */
+export function itemGhost(scene: Phaser.Scene, view: ItemView): Phaser.GameObjects.Container {
+  const { def, box } = view;
+  const parts: Phaser.GameObjects.GameObject[] = [];
+  if (scene.textures.exists(def.spriteId)) {
+    parts.push(scene.add.image(0, 0, def.spriteId).setDisplaySize(box.w, box.h));
+  } else {
+    parts.push(scene.add.rectangle(0, 0, box.w, box.h, def.color).setStrokeStyle(2, COLOR_OUTLINE));
+    parts.push(
+      scene.add
+        .text(0, 0, def.name, {
+          ...textStyle(9),
+          stroke: TEXT_OUTLINE,
+          strokeThickness: 3,
+          align: "center",
+          wordWrap: { width: Math.max(box.w, TILE) },
+        })
+        .setOrigin(0.5),
+    );
+  }
+  return scene.add.container(view.centerX, view.top + box.h / 2, parts);
+}
+
 export function drawRoom(scene: Phaser.Scene): void {
   const g = scene.add.graphics();
   const roomW = BEDROOM.columns * TILE;
@@ -143,6 +192,30 @@ export function drawRoom(scene: Phaser.Scene): void {
   for (let y = WALL_Y + TILE; y < ROOM_BOTTOM; y += TILE) g.lineBetween(ROOM_X, y, ROOM_X + roomW, y);
   g.lineStyle(2, COLOR_OUTLINE).strokeRect(ROOM_X, WALL_Y, roomW, ROOM_BOTTOM - WALL_Y);
   g.fillStyle(COLOR_TRAY).fillRect(0, TRAY_Y, GAME_WIDTH, GAME_HEIGHT - TRAY_Y);
+  drawSpellbook(scene, g);
+}
+
+/** The inventory, drawn as an open spellbook: a trimmed cover, two pages, and a dark spine. */
+function drawSpellbook(scene: Phaser.Scene, g: Phaser.GameObjects.Graphics): void {
+  const coverX = 4;
+  const coverY = TRAY_Y + 2;
+  const coverW = GAME_WIDTH - 8;
+  const coverH = GAME_HEIGHT - TRAY_Y - 6;
+  g.fillStyle(COLOR_BOOK_COVER).fillRoundedRect(coverX, coverY, coverW, coverH, 6);
+  g.lineStyle(2, COLOR_BOOK_TRIM).strokeRoundedRect(coverX, coverY, coverW, coverH, 6);
+
+  const pageY = coverY + 5;
+  const pageH = coverH - 10;
+  const spineX = GAME_WIDTH / 2;
+  const pageW = spineX - SPINE_HALF_W - (coverX + 6);
+  for (const pageX of [coverX + 6, spineX + SPINE_HALF_W]) {
+    g.fillStyle(COLOR_BOOK_PAGE).fillRect(pageX, pageY, pageW, pageH);
+    g.lineStyle(1, COLOR_BOOK_TRIM, 0.45).strokeRect(pageX + 3, pageY + 3, pageW - 6, pageH - 6);
+  }
+  g.fillStyle(COLOR_BOOK_SPINE).fillRect(spineX - SPINE_HALF_W, coverY, SPINE_HALF_W * 2, coverH);
+  g.lineStyle(1, COLOR_BOOK_TRIM, 0.6).lineBetween(spineX, coverY + 2, spineX, coverY + coverH - 2);
+
+  scene.add.text(coverX + 14, TRAY_Y + 10, "magic inventory", textStyle(10, TEXT_MUTED));
 }
 
 /**

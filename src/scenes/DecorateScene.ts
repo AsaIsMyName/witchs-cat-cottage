@@ -5,6 +5,7 @@ import {
   clearRoom,
   moveItem,
   placeFromTray,
+  placementsNotIn,
   planDrop,
   removeToTray,
   surfaceItemsOn,
@@ -12,6 +13,7 @@ import {
   type Target,
 } from "../logic/grid";
 import { CatActor } from "./cat-actor";
+import { openPortal, popIn, sendBack, sparkle } from "./magic-fx";
 import { loadRoom, saveRoom } from "./room-store";
 import {
   DEPTH_FLOOR,
@@ -96,18 +98,25 @@ export class DecorateScene extends Phaser.Scene {
     this.cat = new CatActor(this, () => this.state, () => this.placedViews);
   }
 
-  /** Applies a new room state: saves it, redraws, and lets the cat notice what changed. */
+  /**
+   * Applies a new room state: saves it, redraws, and lets the cat notice what changed. Anything
+   * that went back to the tray spins away from where its view last was, before the redraw destroys it.
+   */
   private setState(next: RoomState): void {
     const prev = this.state;
     this.state = next;
     saveRoom(next);
+    for (const p of placementsNotIn(prev, next)) {
+      const view = this.placedViews.get(p.uid);
+      if (view) sendBack(this, view);
+    }
     this.renderItems();
     this.cat.roomChanged(prev, next);
   }
 
   private addResetButton(): void {
     this.resetButton = this.add
-      .text(GAME_WIDTH - 10, TRAY_Y + 4, "reset room", textStyle(10, TEXT_MUTED))
+      .text(GAME_WIDTH - 14, TRAY_Y + 6, "reset room", textStyle(10, TEXT_MUTED))
       .setOrigin(1, 0)
       .setPadding(6, 4, 6, 4)
       .setInteractive({ useHandCursor: true });
@@ -182,6 +191,11 @@ export class DecorateScene extends Phaser.Scene {
     this.dragged = true;
     view.setDepth(DEPTH_DRAGGING);
     for (const child of children) child.view.setDepth(DEPTH_DRAGGING + 2);
+    if (source.kind === "tray") {
+      // Purely visual, and the view's x/y are untouched: `onDrag` moves it from this same frame.
+      openPortal(this, view.centerX, view.top + view.box.h / 2);
+      popIn(this, view);
+    }
     this.cat.startWatching(pointer.worldX, [view, ...children.map((c) => c.view)]);
   }
 
@@ -204,20 +218,34 @@ export class DecorateScene extends Phaser.Scene {
     this.cat.stopWatching();
 
     let next: RoomState | null = null;
+    /** Where the dragged item ended up in the room, for the landing sparkle. */
+    let landedUid: string | undefined;
     if (pointer.worldY >= TRAY_Y) {
       if (drag.source.kind === "placed") next = removeToTray(this.state, drag.source.uid);
     } else {
       const target = this.targetFor(drag, pointer);
+      const source = drag.source;
       if (target) {
         next =
-          drag.source.kind === "tray"
-            ? placeFromTray(BEDROOM, CATALOG, this.state, drag.source.itemId, target)
-            : moveItem(BEDROOM, CATALOG, this.state, drag.source.uid, target);
+          source.kind === "tray"
+            ? placeFromTray(BEDROOM, CATALOG, this.state, source.itemId, target)
+            : moveItem(BEDROOM, CATALOG, this.state, source.uid, target);
+      }
+      if (next) {
+        landedUid =
+          source.kind === "placed"
+            ? source.uid
+            : placementsNotIn(next, this.state).find((p) => p.itemId === source.itemId)?.uid;
       }
     }
     // A refused drop just re-renders, which snaps the item back to where it came from.
-    if (next) this.setState(next);
-    else this.renderItems();
+    if (!next) {
+      this.renderItems();
+      return;
+    }
+    this.setState(next);
+    const landed = landedUid && this.placedViews.get(landedUid);
+    if (landed) sparkle(this, landed.centerX, landed.top + landed.box.h / 2);
   }
 
   private targetFor(drag: Drag, pointer: Phaser.Input.Pointer): Target | null {
