@@ -2,6 +2,24 @@
 
 > **New session?** Read the top entries and the "Handoff" entry, then CLAUDE.md. Older entries are in `STATUS-archive.md`; read it only when you need history.
 
+## Oct 23, 2026 — Milestone-4 sweep fixes
+
+**Done**
+- **Offended blink after an idle nap:** an idle wander nap now records the rug under the cat (`napRug`), and `roomChanged` checks `napRug` before the "visit not ended" early return. Pulling that rug gives the blink, as it already did for a nap that came from a visit. `napRug` is still cleared in `finish` and `interrupt`.
+- `src/logic/grid.ts`: one private `overlapping()` shared by `canPlace` and `occupantAt`; removed `dropKind` and `DropKind` (tests use `planDrop(...).kind`).
+- Cleanups: route.ts tile-count comment; cat-actor imports `TEXT_OUTLINE` / `COLOR_OUTLINE` from room-view (now exported); `CAT_NAME` comment; pet roll timings moved to `CAT_TIMING` (`petRoll`, `petRest`).
+- `npm run check` passes (184 tests).
+
+**Not verified**
+- Not run in a real browser. `npm run shots` failed here ("Edge didn't start"), so 01 and 02 were not looked at.
+
+**Re-test**
+- Pull a rug from under a cat that's napping on it on its own (not after you placed the rug): it should give the offended blink.
+- Pet an idle cat: the roll and rest should feel the same as before.
+
+**Next**
+- Milestone 4 go/no-go playtest.
+
 ## Oct 23, 2026 — 4c: item names on hover, drop preview
 
 **Done**

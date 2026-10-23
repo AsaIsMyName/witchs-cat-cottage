@@ -87,7 +87,12 @@ export function canPlace(
   const rows = item.layer === "wall" ? room.wallRows : room.floorRows;
   if (col < 0 || row < 0 || col + item.width > room.columns || row + item.height > rows) return false;
 
-  return !state.placements.some((p) => {
+  return overlapping(catalog, state, item, target, ignoreUid).length === 0;
+}
+
+/** The same-layer grid placements that `item` at `target` would overlap. */
+function overlapping(catalog: Catalog, state: RoomState, item: ItemShape, target: GridSpot, ignoreUid?: string): GridPlacement[] {
+  return state.placements.filter((p): p is GridPlacement => {
     if (p.uid === ignoreUid || p.layer === "surface" || p.layer !== item.layer) return false;
     const other = catalog[p.itemId];
     return other !== undefined && overlaps(target, item, p, other);
@@ -108,8 +113,6 @@ export type DropPlan =
   | { kind: "replace"; target: Target; other: Placement }
   | { kind: "blocked" };
 
-export type DropKind = DropPlan["kind"];
-
 /** `movingUid` is the placement being moved, or undefined for an item coming from the tray. */
 export function planDrop(
   room: RoomShape,
@@ -128,17 +131,6 @@ export function planDrop(
     return { kind: "replace", target, other };
   }
   return { kind: "blocked" };
-}
-
-export function dropKind(
-  room: RoomShape,
-  catalog: Catalog,
-  state: RoomState,
-  itemId: string,
-  target: Target,
-  movingUid?: string,
-): DropKind {
-  return planDrop(room, catalog, state, itemId, target, movingUid).kind;
 }
 
 /** Place an item from the tray, replacing a surface item if needed. Returns null if it doesn't fit or none are left. */
@@ -242,11 +234,7 @@ function occupantAt(
   }
   const item = catalog[itemId];
   if (!item || item.layer === "surface") return undefined;
-  const overlapped = state.placements.filter((p): p is GridPlacement => {
-    if (p.uid === ignoreUid || p.layer === "surface" || p.layer !== item.layer) return false;
-    const other = catalog[p.itemId];
-    return other !== undefined && overlaps(target, item, p, other);
-  });
+  const overlapped = overlapping(catalog, state, item, target, ignoreUid);
   return overlapped.length === 1 ? overlapped[0] : undefined;
 }
 

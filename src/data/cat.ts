@@ -2,7 +2,7 @@
 
 import type { CatBehavior, FacingRules, IdleAction, Reaction } from "../logic/cat";
 
-/** Shown in text. Unnamed for now. */
+/** The cat's default name. Not shown in text yet; the player will rename it in milestone 7. */
 export const CAT_NAME = "the cat";
 
 export const CAT_BEHAVIOR: CatBehavior = {
@@ -76,6 +76,9 @@ export const CAT_TIMING = {
   petSlowdown: 0.4,
   petSlowFor: 1000,
   petEaseBack: 400,
+  /** Petted while idle: the roll takes this long, then it rests this long before moving on. */
+  petRoll: 700,
+  petRest: 1200,
   /** Rug pulled out from under a nap: sits up, one slow blink, "mrr.", a tail flick, then carries on. */
   offendedBlink: 700,
   offendedLength: 2200,

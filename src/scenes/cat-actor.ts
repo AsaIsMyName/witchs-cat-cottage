@@ -24,7 +24,18 @@ import {
 } from "../logic/cat";
 import type { RoomState } from "../logic/grid";
 import { canStand, planWalk, type Leg, type Tile } from "../logic/route";
-import { FLOOR_Y, GAME_WIDTH, ItemView, ROOM_X, TEXT_LIGHT, TILE, depthForBottom, textStyle } from "./room-view";
+import {
+  COLOR_OUTLINE,
+  FLOOR_Y,
+  GAME_WIDTH,
+  ItemView,
+  ROOM_X,
+  TEXT_LIGHT,
+  TEXT_OUTLINE,
+  TILE,
+  depthForBottom,
+  textStyle,
+} from "./room-view";
 
 // Placeholder sizes, from the tile size so the cat stays in scale with the room.
 const BODY_W = Math.round(TILE * 0.625);
@@ -49,7 +60,6 @@ const HOP_ARC = Math.round(CAT_TIMING.hopArc * TILE);
 /** It only turns toward something farther than this on either axis, so it doesn't twitch at its own spot. */
 const TURN_DEAD_ZONE = Math.round(TILE / 8);
 const COLOR_CAT = 0x8a6fbf;
-const COLOR_OUTLINE = 0x1e1a2b;
 const COLOR_HEART = "#f28fb0";
 const DEPTH_BUBBLE = 950;
 const BUBBLE_OFFSET = BODY_H + HEAD + 6;
@@ -121,7 +131,7 @@ export class CatActor {
     this.cat.setPosition(start.x, start.y);
     this.updateDepth();
     this.bubble = scene.add
-      .text(0, 0, "", { ...textStyle(10, "#1e1a2b"), backgroundColor: TEXT_LIGHT, padding: { x: 5, y: 2 } })
+      .text(0, 0, "", { ...textStyle(10, TEXT_OUTLINE), backgroundColor: TEXT_LIGHT, padding: { x: 5, y: 2 } })
       .setOrigin(0.5, 1)
       .setDepth(DEPTH_BUBBLE)
       .setVisible(false);
@@ -155,13 +165,11 @@ export class CatActor {
       this.interrupt();
       this.mode = "idle";
       this.hopDown(() => this.later(between(CAT_TIMING.noticeDelay), () => this.next()));
-    } else if (!visitEnded) {
-      return;
     } else if (this.napRug && movedOrRemoved(prev, next, this.napRug)) {
       const rug = this.getViews().get(this.napRug);
       this.interrupt();
       this.offendedBlink(rug && { x: rug.centerX, y: rug.centerY });
-    } else {
+    } else if (visitEnded) {
       this.interrupt();
       this.finish();
     }
@@ -221,10 +229,13 @@ export class CatActor {
     this.mode = "busy";
     this.acting = true;
     this.say(PET_LINE);
-    this.tween({ targets: this.cat, angle: facingSign(this.facing) * 360, duration: 700, ease: "Quad.easeInOut" }, () => {
-      this.cat.angle = 0;
-      this.later(1200, () => this.finish());
-    });
+    this.tween(
+      { targets: this.cat, angle: facingSign(this.facing) * 360, duration: CAT_TIMING.petRoll, ease: "Quad.easeInOut" },
+      () => {
+        this.cat.angle = 0;
+        this.later(CAT_TIMING.petRest, () => this.finish());
+      },
+    );
   }
 
   /**
@@ -331,8 +342,10 @@ export class CatActor {
       this.acting = true;
       this.restY = this.cat.y;
       this.say(IDLE_LINES[action]);
-      if (action === "nap") this.nap();
-      else if (action === "sit") this.squash(0.85);
+      if (action === "nap") {
+        this.napRug = this.rugUnderfoot();
+        this.nap();
+      } else if (action === "sit") this.squash(0.85);
       else this.tween({ targets: this.cat, y: this.cat.y - GROOM_BOB, duration: 200, yoyo: true, repeat: 3 });
       this.later(action === "nap" ? between(CAT_TIMING.napLength) : between(CAT_TIMING.idleGap), () => this.finish());
     });
@@ -467,6 +480,15 @@ export class CatActor {
       this.walkLeg(legs[i], i === 0 ? from : legs[i - 1], replanned || i > 0, exactEnd, () => step(i + 1));
     };
     step(0);
+  }
+
+  /** The uid of the rug under the cat, if any (an idle nap on it still gets the offended blink). */
+  private rugUnderfoot(): string | undefined {
+    const { col, row } = this.tileHere();
+    return this.getState().placements.find((p) => {
+      const def = CATALOG[p.itemId];
+      return p.layer === "rug" && def && col >= p.col && col < p.col + def.width && row >= p.row && row < p.row + def.height;
+    })?.uid;
   }
 
   /** The floor tile the cat is on (for a perch, the furniture's front-row tile under it). */

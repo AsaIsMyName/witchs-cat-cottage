@@ -155,7 +155,7 @@ function floorCells(room: RoomShape, catalog: Catalog, state: RoomState): Cell[]
   return cells;
 }
 
-/** Dijkstra over the floor tiles. 36 tiles, so a plain scan for the cheapest open tile is plenty. */
+/** Dijkstra over the floor tiles. 16x9 = 144 tiles, so a plain scan for the cheapest open tile is plenty. */
 function search(room: RoomShape, cells: Cell[][], origin: Tile, climbCost: number, frontBackHopCost: number) {
   const n = room.columns * room.floorRows;
   const cost = new Array<number>(n).fill(Infinity);

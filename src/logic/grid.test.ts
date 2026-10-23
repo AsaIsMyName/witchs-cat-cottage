@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   canPlace,
   clearRoom,
-  dropKind,
   emptyRoom,
   isValidState,
   moveItem,
@@ -135,9 +134,9 @@ describe("replacing surface items", () => {
 
   it("reports a drop on an occupied slot as a replace", () => {
     const s = setup();
-    expect(dropKind(room, catalogWithPotion, s, "candle", { kind: "surface", hostUid: "p1", slot: 0 })).toBe("replace");
-    expect(dropKind(room, catalogWithPotion, s, "candle", { kind: "surface", hostUid: "p2", slot: 0 })).toBe("place");
-    expect(dropKind(room, catalogWithPotion, s, "candle", { kind: "surface", hostUid: "p1", slot: 1 })).toBe("blocked");
+    expect(planDrop(room, catalogWithPotion, s, "candle", { kind: "surface", hostUid: "p1", slot: 0 }).kind).toBe("replace");
+    expect(planDrop(room, catalogWithPotion, s, "candle", { kind: "surface", hostUid: "p2", slot: 0 }).kind).toBe("place");
+    expect(planDrop(room, catalogWithPotion, s, "candle", { kind: "surface", hostUid: "p1", slot: 1 }).kind).toBe("blocked");
   });
 
   it("swaps a tray item in and sends the old one to the tray", () => {
@@ -155,7 +154,7 @@ describe("replacing surface items", () => {
   it("swaps places when moving one room item onto another", () => {
     const before = placeFromTray(room, catalogWithPotion, setup(), "candle", { kind: "surface", hostUid: "p2", slot: 1 })!;
     const onShelf = { kind: "surface", hostUid: "p1", slot: 0 } as const;
-    expect(dropKind(room, catalogWithPotion, before, "candle", onShelf, "p4")).toBe("swap");
+    expect(planDrop(room, catalogWithPotion, before, "candle", onShelf, "p4").kind).toBe("swap");
     const s = moveItem(room, catalogWithPotion, before, "p4", onShelf)!;
     expect(surfaceItemsOn(s, "p1")).toEqual([{ uid: "p4", itemId: "candle", layer: "surface", hostUid: "p1", slot: 0 }]);
     expect(surfaceItemsOn(s, "p2")).toEqual([{ uid: "p3", itemId: "potion", layer: "surface", hostUid: "p2", slot: 1 }]);
@@ -173,12 +172,14 @@ describe("replacing surface items", () => {
   });
 
   it("still sends the old item to the tray when the new one comes from the tray", () => {
-    expect(dropKind(room, catalogWithPotion, setup(), "candle", { kind: "surface", hostUid: "p1", slot: 0 })).toBe("replace");
+    expect(planDrop(room, catalogWithPotion, setup(), "candle", { kind: "surface", hostUid: "p1", slot: 0 }).kind).toBe(
+      "replace",
+    );
   });
 
   it("treats dropping an item back on its own slot as a normal place", () => {
     const s = setup();
-    expect(dropKind(room, catalogWithPotion, s, "potion", { kind: "surface", hostUid: "p1", slot: 0 }, "p3")).toBe("place");
+    expect(planDrop(room, catalogWithPotion, s, "potion", { kind: "surface", hostUid: "p1", slot: 0 }, "p3").kind).toBe("place");
     expect(moveItem(room, catalogWithPotion, s, "p3", { kind: "surface", hostUid: "p1", slot: 0 })).toEqual(s);
   });
 });
@@ -188,7 +189,7 @@ describe("swapping wall and floor items", () => {
     let s = place(start(), "frame", { kind: "grid", col: 0, row: 0 });
     s = place(s, "shelf", { kind: "grid", col: 3, row: 1 });
     s = place(s, "candle", { kind: "surface", hostUid: "p2", slot: 0 });
-    expect(dropKind(room, catalog, s, "shelf", { kind: "grid", col: 0, row: 0 }, "p2")).toBe("swap");
+    expect(planDrop(room, catalog, s, "shelf", { kind: "grid", col: 0, row: 0 }, "p2").kind).toBe("swap");
     s = moveItem(room, catalog, s, "p2", { kind: "grid", col: 0, row: 0 })!;
     expect(s.placements).toEqual([
       { uid: "p1", itemId: "frame", layer: "wall", col: 3, row: 1 },
@@ -226,18 +227,18 @@ describe("swapping wall and floor items", () => {
     let s = emptyRoom({ rug: 2 });
     s = place(s, "rug", { kind: "grid", col: 0, row: 0 });
     s = place(s, "rug", { kind: "grid", col: 6, row: 1 });
-    expect(dropKind(room, catalog, s, "rug", { kind: "grid", col: 6, row: 1 }, "p1")).toBe("swap");
+    expect(planDrop(room, catalog, s, "rug", { kind: "grid", col: 6, row: 1 }, "p1").kind).toBe("swap");
   });
 
   it("blocks drops covering two items and drops from the tray", () => {
     const s = place(start(), "table", { kind: "grid", col: 4, row: 0 });
-    expect(dropKind(room, catalog, s, "table", { kind: "grid", col: 4, row: 0 })).toBe("blocked");
+    expect(planDrop(room, catalog, s, "table", { kind: "grid", col: 4, row: 0 }).kind).toBe("blocked");
 
     let t = emptyRoom({ table: 3 });
     t = place(t, "table", { kind: "grid", col: 0, row: 0 });
     t = place(t, "table", { kind: "grid", col: 2, row: 0 });
     t = place(t, "table", { kind: "grid", col: 6, row: 0 });
-    expect(dropKind(room, catalog, t, "table", { kind: "grid", col: 1, row: 0 }, "p3")).toBe("blocked");
+    expect(planDrop(room, catalog, t, "table", { kind: "grid", col: 1, row: 0 }, "p3").kind).toBe("blocked");
   });
 });
 
@@ -292,7 +293,7 @@ describe("swapping different footprints", () => {
     let s = place(setup(), "stool", { kind: "grid", col: 5, row: 1 });
     s = place(s, "cauldron", { kind: "grid", col: 4, row: 1 });
     s = place(s, "cauldron", { kind: "grid", col: 6, row: 1 });
-    expect(dropKind(room, catalog, s, "stool", { kind: "grid", col: 0, row: 0 }, "p3")).toBe("blocked");
+    expect(planDrop(room, catalog, s, "stool", { kind: "grid", col: 0, row: 0 }, "p3").kind).toBe("blocked");
   });
 
   it("swaps a 2×2 item with a 2×1 item", () => {
