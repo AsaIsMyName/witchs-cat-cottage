@@ -20,6 +20,10 @@ export const SURFACE_ITEM_H = 22;
 const DEPTH_WALL = 10;
 const DEPTH_RUG = 50;
 export const DEPTH_FLOOR = 100;
+/** The spellbook's items, their counts, and its text: above the cat floating in the book. */
+export const DEPTH_BOOK_ITEMS = DEPTH_FLOOR;
+/** The cat floating in the spellbook: above the book's drawing (depth 0), behind everything on the pages. */
+export const DEPTH_BOOK_CAT = 5;
 
 const COLOR_WALL = 0x3d3357;
 const COLOR_FLOOR = 0x5a4632;
@@ -246,7 +250,7 @@ function drawSpellbook(scene: Phaser.Scene, g: Phaser.GameObjects.Graphics): voi
   g.lineStyle(1, COLOR_BOOK_TRIM, 0.6).lineBetween(SPINE_X, cover.y + 2, SPINE_X, cover.y + cover.h - 2);
 
   const heading = pageItemArea(BOOK_PAGES[0]);
-  scene.add.text(heading.x, TRAY_HEADING_Y, "magic inventory", textStyle(10, TEXT_MUTED));
+  scene.add.text(heading.x, TRAY_HEADING_Y, "magic inventory", textStyle(10, TEXT_MUTED)).setDepth(DEPTH_BOOK_ITEMS);
 }
 
 /**

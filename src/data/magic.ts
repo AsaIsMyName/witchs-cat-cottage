@@ -13,6 +13,8 @@ export const MAGIC_FX = {
     colors: [0xc9a0ff, 0xf3d27a],
     lineWidth: 2,
   },
+  /** The cat's portal dive: a smaller ring that stays open while the cat sinks in or hops out. */
+  catPortal: { duration: 1100, radius: 18 },
   /** Summon: the picked-up item pops from this scale to full size. */
   pop: { from: 0.85, duration: 120 },
   /** Land: small four-point stars fly out from the item and fade. */

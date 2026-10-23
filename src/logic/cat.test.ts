@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedItems, displaced, movedOrRemoved, pickIdle, slotSide, toBack, reactionFor, type CatBehavior, type TaggedCatalog } from "./cat";
+import { bookReactionFor, changedItems, displaced, movedOrRemoved, nextActivity, nextDiveAt, pickIdle, slotSide, toBack, reactionFor, type BookReactionRule, type CatBehavior, type TaggedCatalog } from "./cat";
 import { emptyRoom, moveItem, placeFromTray, removeToTray, type RoomShape, type RoomState, type Target } from "./grid";
 
 const room: RoomShape = { columns: 12, wallRows: 3, floorRows: 3 };
@@ -204,5 +204,55 @@ describe("slotSide", () => {
     expect(slotSide(2, 3)).toBe("right");
     expect(slotSide(1, 4)).toBe("left");
     expect(slotSide(2, 4)).toBe("right");
+  });
+});
+
+describe("nextActivity", () => {
+  it("picks an idle activity before a dive is due", () => {
+    expect(nextActivity(0, 59_999, 60_000)).toBe("idle");
+  });
+
+  it("visits queued items first, even when a dive is due", () => {
+    expect(nextActivity(2, 90_000, 60_000)).toBe("visit");
+    expect(nextActivity(1, 0, 60_000)).toBe("visit");
+  });
+
+  it("dives once it's due and the cat is free", () => {
+    expect(nextActivity(0, 60_000, 60_000)).toBe("dive");
+    expect(nextActivity(0, 75_000, 60_000)).toBe("dive");
+  });
+});
+
+describe("nextDiveAt", () => {
+  const range: [number, number] = [60_000, 120_000];
+
+  it("draws the next dive within the range after now, using the injected random", () => {
+    expect(nextDiveAt(5_000, range, () => 0)).toBe(65_000);
+    expect(nextDiveAt(5_000, range, () => 0.5)).toBe(95_000);
+    const late = nextDiveAt(5_000, range, () => 0.9999);
+    expect(late).toBeGreaterThan(124_000);
+    expect(late).toBeLessThan(125_000);
+  });
+});
+
+describe("bookReactionFor", () => {
+  const rules: BookReactionRule[] = [
+    { reaction: "paw-air", tags: ["shiny"] },
+    { reaction: "blink", tags: ["warm"] },
+    { reaction: "stare", tags: ["spooky"] },
+    { reaction: "curl", tags: ["soft"] },
+  ];
+
+  it("picks by tags, first match wins", () => {
+    expect(bookReactionFor(["shiny", "fragile"], rules)).toBe("paw-air");
+    expect(bookReactionFor(["warm", "shiny"], rules)).toBe("paw-air");
+    expect(bookReactionFor(["warm", "spooky"], rules)).toBe("blink");
+    expect(bookReactionFor(["spooky"], rules)).toBe("stare");
+    expect(bookReactionFor(["soft", "cozy"], rules)).toBe("curl");
+  });
+
+  it("sniffs at anything else", () => {
+    expect(bookReactionFor(["cozy"], rules)).toBe("sniff");
+    expect(bookReactionFor([], rules)).toBe("sniff");
   });
 });
