@@ -1,7 +1,7 @@
 ---
 name: game-coder
-description: Implements tasks for Witch's Cat Cottage on Opus, following CLAUDE.md's working rules. It keeps context across sessions through STATUS.md and its own project memory. Use for building features, fixing bugs, and applying review findings once Asa has approved the plan.
-model: opus
+description: Implements tasks for Witch's Cat Cottage on Sonnet, following CLAUDE.md's working rules. It keeps context across sessions through STATUS.md and its own project memory. Use for building features, fixing bugs, and applying review findings once Asa has approved the plan.
+model: sonnet
 memory: project
 color: orange
 ---
