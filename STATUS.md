@@ -1,5 +1,104 @@
 # Status
 
+## Oct 22, 2026 — Milestone 4b: the cat in ¾ (awaiting playtest)
+
+The cat now faces four ways, hides behind tall furniture, and walks at its old pace in tiles. Routing, reactions, petting, the offended blink, perch hop-down, and the visit queue are unchanged.
+
+**Done**
+- 4-direction facing. `facing: 1 | -1` is replaced by `Facing` ("up" | "down" | "left" | "right") in `src/logic/cat.ts`, with pure helpers:
+  - `facingFor(dx, dy, current, deadZone)`: the dominant axis, left/right on a tie; inside the dead zone (no movement) it keeps the current way.
+  - `facingStep` (a unit step toward what it faces, for nudges) and `facingSign` (-1 facing left, else 1, for the scaleX flip and the pet roll).
+- When it turns (`cat-actor.ts`):
+  - Each walk leg and hop faces its direction. `turnTo` takes a point, with a `TILE / 8` dead zone (was 4px on x only).
+  - Reactions: a wall item, or something on a shelf, faces up. Beside furniture, it faces the furniture's footprint center, so a tall item beside it reads as beside it. On the item itself (a loaf, a nap on the rug) it faces down. A loaf or rug it couldn't reach faces the item.
+  - A resting cat faces down: on arriving from a walk, and after hopping down from a moved perch. A visit then turns it toward the item, and it keeps that facing until its next walk.
+  - Glances at a drag use the pointer's x and y (`startWatching`/`glanceAt` now take y), so dragging in the book makes it look down. The offended blink turns toward the rug's new spot in x and y.
+- Placeholder drawing: `makeCat()` builds the parts and a new `drawFacing()` lays them out per facing, redoing the draw order with `bringToTop`.
+  - Left/right: the side view as before (flipped for left).
+  - Down: a narrower 13×13 body reaching up the screen, the head at its front edge with both ears, and the tail rising behind it.
+  - Up: the same body, a smaller head behind it (only its top and ears show over the far end), and the tail hanging toward the viewer from its base.
+  - The blink's rest position (`faceY`) is re-read on every turn.
+- Depth: checked headless, no change needed. On the floor the cat sorts by its feet (`depthForBottom`) every frame. A cauldron in the row in front hides it; in the row behind, the cat draws over it; up on a table it draws over the table and its candle (host + 2). At the wall-reaction spot (back floor row, facing up) it draws over the wall band, and only an item standing in the row in front of it can cover it.
+- Timing (`CAT_TIMING`), now in tiles so it holds at any tile size; the scene multiplies by `TILE`:
+  - `walkSpeed` 1.875 tiles/s (60 px/s; the old 90 px/s at 48px tiles). Measured headless: exactly 60 px/s.
+  - `topWalkSpeed` 1.25 tiles/s (40 px/s; the old 60 px/s).
+  - `hop` 400ms and `hopDown` 350ms, unchanged. `hopArc` 0.16 tiles (5px; was 4px).
+- Nudges from `TILE`: bat 3px, sniff 2px, stare hop 4px, groom bob 2px, blink dip 2px, item wobble 3px.
+- `pickIdle` already picks uniformly over the room's columns and floor rows; a new test checks it reaches col 15, row 8 of a 16×9 floor.
+- CLAUDE.md "The cat" → Behavior: a bullet on 4-way facing and passing behind taller furniture.
+- 177 unit tests pass (6 new: facing rules, diagonals, ties, dead zone, steps, and the 16×9 wander). `npm run build` passes (the usual chunk-size warning).
+
+**Not verified**
+- Checked only in headless Edge against the dev server: zoomed shots of each facing, the cat behind/beside/in front of a cauldron, behind and loafing on a table, under a wall clock facing up, a measured straight walk, and a few seconds of the cat's own routine. Not run in a real browser by Asa. Hops, the pet roll in each facing, and the offended blink weren't watched.
+- A cauldron (or other tall item) in floor row 1 fully hides a cat reacting to a wall item above it in row 0: it's correctly behind it, but you can't see the reaction. The cat is shorter than a tile, so anything standing a tile tall in front hides all of it, not just its lower part.
+
+**Re-test**
+- Watch it walk around: does it face the way it's going, including up toward the wall and down toward you? Do the up and down placeholders read as a cat facing away and toward you?
+- Diagonal routes: it shouldn't flicker between facings on a near-diagonal leg.
+- Reactions: a clock or moon chart (faces up), the cauldron and a candle on the table (faces the furniture from beside it), a loaf and a rug nap (face down).
+- Drag something while it sits: does it glance toward the item, including down when you drag in the book?
+- Walk it behind the cauldron and the table: hidden behind them, in front of things behind it. Loaf on the table: over the table and its candle.
+- Pace: does a 1.9 tiles/s stroll feel cozy across 16 columns, and is the hop arc visible but small?
+- Pet it facing up and down: roll-over, tail wiggle, and the heart still look right.
+- Pull the rug out from under a nap: the blink still reads in whatever way it turned.
+
+**Next**
+- Asa playtests 4b.
+- 4c: hover name and drop preview.
+
+## Oct 22, 2026 — Handoff: where the project stands, and what's next
+
+Written before a session restart so the next session can pick up cleanly. Read this first, then CLAUDE.md.
+
+**Where things stand**
+- **Live on `main` (GitHub Pages):** `e71641d`. It has milestones 0–3a, the cat's floor routing and climbing, and the magic redesign of CLAUDE.md.
+- **On `Feature_InitialBranch`, not merged yet:**
+  - the 3b portal dive, reverted (dropped)
+  - the PC-first and ¾-view redesign of CLAUDE.md
+  - **4a, the ¾ room view** (signed off): 960×540, 32px tiles of 16px art, 16 columns, 2 wall rows, 9 floor rows, the book sized to its contents
+  - **4b, the cat in ¾:** 4-direction facing, hiding behind tall furniture, movement tuned for 32px tiles. Its own entry above has the details once it's in.
+- **Milestone 4 = ¾ room view:** 4a done, 4b next (or done), then 4c: the item name on hover and a drop preview.
+- **Merge rule:** see the note under "Workflow". Nothing goes to `main` without Asa's go.
+
+**Next steps, in this order (agreed with Asa)**
+1. **Finish 4b:** Asa playtests it locally and signs off.
+2. **Restart the session** so the agents in `.claude/agents/` are properly registered. Then use `game-coder`, `code-reviewer-opus`, and `code-reviewer-sonnet` **by name**. Until now they were run as general agents told to read their files, so the coder's `memory: project` was never used.
+   - The first time `game-coder` runs, ask it to report its memory folder.
+   - Seed it with the lessons below.
+3. **Tooling (one small task):**
+   - add ESLint and Prettier to `npm run check`
+   - add a GitHub Actions gate so `main` only deploys a build that passes `npm run check`
+   - add a Claude Code hook that runs the checks before commits
+
+   Asa approved all three in principle; propose the details first.
+4. **Design-guardian agent and screenshots:**
+   - A read-only agent that checks plans and diffs against CLAUDE.md's intent, before the coder starts: decorating first, the cat never judges, earning never a bottleneck, nothing from "Not in v1", cozy and magical tone.
+   - An `npm run shots` script that captures fixed scenes (empty room, busy room, each cat facing, drag highlights) from seeded saves. Check the screenshots after each visual task, before Asa playtests. Headless screenshots worked during 4a.
+5. **4c:** the item name on hover and a drop preview while dragging.
+6. **Review and merge:** both reviewers on everything since `e71641d`, then merge on Asa's go.
+7. **Later:** milestone 5 (room themes and 25–30 items; revisit the book layout and paging then). A content-designer agent could draft item data. The art pass (milestone 8) could use a sprite-artist agent and a style-check script.
+
+**Lessons for the coder's memory** (durable; seed these)
+- **Environment:**
+  - Node isn't on PATH in PowerShell. Prefix commands with `$env:Path = "C:\Program Files\nodejs;$env:Path";`. Git Bash has no `npm`.
+  - The dev server usually runs on port 5173. Don't start or kill it unless asked.
+  - Never take line numbers from `cat -n` over several files: the numbering runs on across files.
+- **Codebase pitfalls:**
+  - **Views are rebuilt:** `renderItems()` destroys and rebuilds every item view on each state change. Never hold an `ItemView` across a walk or delay; look it up again by uid.
+  - **Interrupts:** cat delays and tweens go through `later()` / `tween()`, which are guarded by the interrupt token. Movement tweens drive a progress counter, so `interrupt()` must remove `this.move` explicitly.
+  - **Drop math** reads `view.x/y`. Visual effects (`ItemView.setScale`, pops) only change what's drawn.
+  - **One source of truth:** book geometry is `BOOK_PAGES` / `pageItemArea`. The room layout is derived from `TRAY_Y` and `BEDROOM`. Depth is by bottom edge (`depthForBottom`).
+  - **Logic lives in `src/logic`** (no Phaser) with Vitest tests. Content and tuning live in `src/data`.
+- **Asa's preferences:**
+  - Ask when a decision isn't in CLAUDE.md, and offer a recommendation with the question.
+  - Asa's feedback is specific and visual. Always state plainly what wasn't verified in a browser.
+  - The theme is cozy and magical, decorating comes first, and the cat never judges.
+
+**Workflow**
+- Work on `Feature_InitialBranch`, and commit there with the attribution line. Each task ends with a STATUS.md entry: Done, Not verified, Re-test, Next.
+- Merge to `main` only after Asa's local playtest, a review by both reviewers with no blockers, and Asa's go. Then fast-forward `main` and push; that deploys.
+- Run the dev server with `npm run dev` from the project folder, then open http://localhost:5173.
+
 ## Oct 22, 2026 — Milestone 4a: ¾ room view (signed off)
 
 Playtest: **signed off** (Oct 22, 2026). Asa's decisions on the open questions:

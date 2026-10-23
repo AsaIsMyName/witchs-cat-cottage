@@ -213,7 +213,7 @@ export class DecorateScene extends Phaser.Scene {
       openPortal(this, view.centerX, view.centerY);
       popIn(this, view);
     }
-    this.cat.startWatching(pointer.worldX, [view, ...children.map((c) => c.view)]);
+    this.cat.startWatching(pointer.worldX, pointer.worldY, [view, ...children.map((c) => c.view)]);
   }
 
   private onDrag(pointer: Phaser.Input.Pointer): void {
@@ -224,7 +224,7 @@ export class DecorateScene extends Phaser.Scene {
     drag.view.setPosition(x, y);
     for (const child of drag.children) child.view.setPosition(x + child.dx, y + child.dy);
     this.drawHighlight(drag, pointer);
-    this.cat.glanceAt(pointer.worldX);
+    this.cat.glanceAt(pointer.worldX, pointer.worldY);
   }
 
   private onDragEnd(pointer: Phaser.Input.Pointer): void {

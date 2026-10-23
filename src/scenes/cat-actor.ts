@@ -8,11 +8,15 @@ import { BEDROOM } from "../data/rooms";
 import {
   changedItems,
   displaced,
+  facingFor,
+  facingSign,
+  facingStep,
   movedOrRemoved,
   pickIdle,
   reactionFor,
   slotSide,
   toBack,
+  type Facing,
   type IdleAction,
   type Reaction,
 } from "../logic/cat";
@@ -24,8 +28,24 @@ import { FLOOR_Y, GAME_WIDTH, ItemView, ROOM_X, TEXT_LIGHT, TILE, depthForBottom
 const BODY_W = Math.round(TILE * 0.625);
 const BODY_H = Math.round(TILE * 0.3);
 const HEAD = Math.round(TILE * 0.25);
+/** Seen from the front or back (facing down or up), the body is narrower and looks deeper. */
+const FRONT_W = Math.round(TILE * 0.4);
+const FRONT_H = Math.round(TILE * 0.4);
+const TAIL_W = 3;
+const TAIL_L = Math.round(TILE * 0.25);
+const EAR = Math.max(2, Math.round(HEAD / 3));
 /** How far above its tile's front edge the cat's feet rest. */
 const FEET_INSET = Math.round(TILE / 8);
+// Nudges and bobs, from the tile size so they stay in scale (2–4px at 32px tiles).
+const BAT_NUDGE = Math.round(TILE / 10);
+const SNIFF_NUDGE = Math.round(TILE / 16);
+const STARE_HOP = Math.round(TILE / 8);
+const GROOM_BOB = Math.round(TILE / 16);
+const BLINK_DIP = Math.round(TILE / 16);
+const WOBBLE = Math.round(TILE / 10);
+const HOP_ARC = Math.round(CAT_TIMING.hopArc * TILE);
+/** It only turns toward something farther than this on either axis, so it doesn't twitch at its own spot. */
+const TURN_DEAD_ZONE = Math.round(TILE / 8);
 const COLOR_CAT = 0x8a6fbf;
 const COLOR_OUTLINE = 0x1e1a2b;
 const COLOR_HEART = "#f28fb0";
@@ -46,9 +66,11 @@ interface Point {
 export class CatActor {
   private readonly cat: Phaser.GameObjects.Container;
   private readonly tail: Phaser.GameObjects.Rectangle;
+  private readonly body: Phaser.GameObjects.Rectangle;
   /** Head and ears, which dip together for a slow blink. */
   private readonly face: Phaser.GameObjects.Rectangle[];
-  private readonly faceY: number[];
+  /** Where the face rests in the current facing, to put it back after a blink. */
+  private faceY: number[] = [];
   private readonly bubble: Phaser.GameObjects.Text;
   private mode: Mode = "idle";
   private pose: Pose = "resting";
@@ -57,7 +79,8 @@ export class CatActor {
   /** Bumped on every interrupt; scheduled steps from an older token are dropped. */
   private token = 0;
   private readonly queue: string[] = [];
-  private facing: 1 | -1 = 1;
+  /** Which way it faces; a resting cat faces down (toward the viewer) unless it just turned toward something. */
+  private facing: Facing = "down";
   /**
    * The furniture the cat is up on, and the floor y in front of it. `crossing` means it's only
    * passing over on a walk; an interrupt then drops it to the floor instead of leaving it up there.
@@ -88,8 +111,8 @@ export class CatActor {
     private readonly getState: () => RoomState,
     private readonly getViews: () => Map<string, ItemView>,
   ) {
-    ({ cat: this.cat, tail: this.tail, face: this.face } = this.makeCat());
-    this.faceY = this.face.map((part) => part.y);
+    ({ cat: this.cat, tail: this.tail, body: this.body, face: this.face } = this.makeCat());
+    this.drawFacing();
     const start = floorPoint(Phaser.Math.Between(2, BEDROOM.columns - 3), BEDROOM.floorRows - 1);
     this.cat.setPosition(start.x, start.y);
     this.updateDepth();
@@ -129,7 +152,7 @@ export class CatActor {
     } else if (this.napRug && movedOrRemoved(prev, next, this.napRug)) {
       const rug = this.getViews().get(this.napRug);
       this.interrupt();
-      this.offendedBlink(rug?.centerX);
+      this.offendedBlink(rug && { x: rug.centerX, y: rug.centerY });
     } else {
       this.interrupt();
       this.finish();
@@ -140,15 +163,15 @@ export class CatActor {
    * The player picked something up. The cat keeps doing what it's doing, but may glance over.
    * `held` is every item view being carried, so wobbles leave them alone.
    */
-  startWatching(x: number, held: ItemView[]): void {
+  startWatching(x: number, y: number, held: ItemView[]): void {
     this.watching = true;
     for (const view of held) this.held.add(view);
-    this.glanceAt(x);
+    this.glanceAt(x, y);
   }
 
-  /** Turns toward `x`, but only if the cat is idle and sitting still. */
-  glanceAt(x: number): void {
-    if (this.watching && this.mode === "idle" && this.pose === "resting") this.turnTo(x);
+  /** Turns toward (`x`, `y`), but only if the cat is idle and sitting still. */
+  glanceAt(x: number, y: number): void {
+    if (this.watching && this.mode === "idle" && this.pose === "resting") this.turnTo({ x, y });
   }
 
   stopWatching(): void {
@@ -174,7 +197,7 @@ export class CatActor {
     this.mode = "busy";
     this.acting = true;
     this.say(PET_LINE);
-    this.tween({ targets: this.cat, angle: this.facing * 360, duration: 700, ease: "Quad.easeInOut" }, () => {
+    this.tween({ targets: this.cat, angle: facingSign(this.facing) * 360, duration: 700, ease: "Quad.easeInOut" }, () => {
       this.cat.angle = 0;
       this.later(1200, () => this.finish());
     });
@@ -268,7 +291,7 @@ export class CatActor {
         }
         // A perch it couldn't reach (boxed in) left the route on the nearest floor tile; it reacts from there.
         if (reaction === "nap" && now.def.layer === "rug") this.napRug = uid;
-        this.turnTo(now.centerX);
+        this.faceItem(uid, reaction, now, point);
         this.react(reaction, now);
         this.later(length, () => this.finish());
       },
@@ -283,12 +306,15 @@ export class CatActor {
       this.say(IDLE_LINES[action]);
       if (action === "nap") this.nap();
       else if (action === "sit") this.squash(0.85);
-      else this.tween({ targets: this.cat, y: this.cat.y - 2, duration: 200, yoyo: true, repeat: 3 });
+      else this.tween({ targets: this.cat, y: this.cat.y - GROOM_BOB, duration: 200, yoyo: true, repeat: 3 });
       this.later(action === "nap" ? between(CAT_TIMING.napLength) : between(CAT_TIMING.idleGap), () => this.finish());
     });
   }
 
   private react(reaction: Reaction, view: ItemView): void {
+    const step = facingStep(this.facing);
+    /** A little push toward whatever it faces, and back. */
+    const nudge = (px: number) => ({ x: this.cat.x + step.x * px, y: this.cat.y + step.y * px });
     this.acting = true;
     this.restY = this.cat.y;
     this.say(REACTION_LINES[reaction]);
@@ -307,14 +333,14 @@ export class CatActor {
         this.later(250, () => this.wobble(view));
         break;
       case "bat":
-        this.tween({ targets: this.cat, x: this.cat.x + this.facing * 3, duration: 90, yoyo: true, repeat: 3 });
+        this.tween({ targets: this.cat, ...nudge(BAT_NUDGE), duration: 90, yoyo: true, repeat: 3 });
         this.later(150, () => this.wobble(view));
         break;
       case "stare":
-        this.tween({ targets: this.cat, y: this.cat.y - 4, duration: 120, yoyo: true });
+        this.tween({ targets: this.cat, y: this.cat.y - STARE_HOP, duration: 120, yoyo: true });
         break;
       case "sniff":
-        this.tween({ targets: this.cat, x: this.cat.x + this.facing * 2, duration: 120, yoyo: true, repeat: 3 });
+        this.tween({ targets: this.cat, ...nudge(SNIFF_NUDGE), duration: 120, yoyo: true, repeat: 3 });
         break;
     }
   }
@@ -340,6 +366,24 @@ export class CatActor {
         ? right < ROOM_X + BEDROOM.columns * TILE - BODY_W ? right : left
         : left > ROOM_X + BODY_W ? left : right;
     return { point: { x, y: footprintBottom(anchor) - FEET_INSET }, perch: false };
+  }
+
+  /**
+   * Faces what it reacts to: up at a wall item or something on a shelf, toward the furniture it
+   * stands beside (or the item, on the floor). Up on the item itself (a loaf, a nap on the rug at
+   * `point`), it faces the viewer.
+   */
+  private faceItem(uid: string, reaction: Reaction, view: ItemView, point: Point): void {
+    const onIt =
+      reaction === "loaf"
+        ? this.perch?.uid === uid
+        : reaction === "nap" && view.def.layer === "rug" && Phaser.Math.Distance.BetweenPoints(this.cat, point) < TILE / 2;
+    if (onIt) return this.setFacing("down");
+    const placement = this.getState().placements.find((p) => p.uid === uid);
+    const anchor = (placement?.layer === "surface" ? this.getViews().get(placement.hostUid) : undefined) ?? view;
+    if (anchor.def.layer === "wall") return this.setFacing("up");
+    // The middle of its footprint, not its drawn shape, so a tall item beside the cat reads as beside it.
+    this.turnTo({ x: anchor.centerX, y: footprintBottom(anchor) - (anchor.def.height * TILE) / 2 });
   }
 
   /**
@@ -406,11 +450,11 @@ export class CatActor {
     const target = exact ?? (leg.climb && host ? { x: floorPoint(leg.col, leg.row).x, y: host.seatY } : floorPoint(leg.col, leg.row));
     const distance = Phaser.Math.Distance.Between(this.cat.x, this.cat.y, target.x, target.y);
     if (distance < 2) return then();
-    this.turnTo(target.x);
-    /** `speed` in px per second; none means a hop. */
+    this.turnTo(target);
+    /** `speed` in tiles per second; none means a hop. */
     const move = (speed: number | undefined, trackDepth: boolean) => {
-      if (speed === undefined) return this.startMove(target, CAT_TIMING.hop, then, { arc: CAT_TIMING.hopArc });
-      this.startMove(target, Math.max(150, (distance / speed) * 1000), then, { trackDepth });
+      if (speed === undefined) return this.startMove(target, CAT_TIMING.hop, then, { arc: HOP_ARC });
+      this.startMove(target, Math.max(150, (distance / (speed * TILE)) * 1000), then, { trackDepth });
     };
 
     if (leg.climb && host && leg.on !== undefined) {
@@ -436,6 +480,8 @@ export class CatActor {
   private arrive(then: () => void): void {
     this.restY = undefined;
     this.pose = "resting";
+    this.setFacing("down"); // a visit then turns it toward the item
+
     if (this.perch) this.perch = { uid: this.perch.uid, groundY: this.perch.groundY };
     this.updateDepth();
     then();
@@ -447,13 +493,14 @@ export class CatActor {
     const landed = () => {
       this.restY = undefined;
       this.pose = "resting";
+      this.setFacing("down");
       this.updateDepth();
       then();
     };
     if (Math.abs(groundY - this.cat.y) < 2) return landed(); // already dropped to the floor by an interrupt
     this.pose = "walking";
     this.restY = groundY;
-    this.startMove({ x: this.cat.x, y: groundY }, CAT_TIMING.hopDown, landed, { arc: CAT_TIMING.hopArc });
+    this.startMove({ x: this.cat.x, y: groundY }, CAT_TIMING.hopDown, landed, { arc: HOP_ARC });
   }
 
   /**
@@ -480,18 +527,18 @@ export class CatActor {
   }
 
   /**
-   * Woken by its rug sliding away: sits up, turns toward where the rug went (`towardX`, if it's
+   * Woken by its rug sliding away: sits up, turns toward where the rug went (`toward`, if it's
    * still in the room), gives one slow unimpressed blink and a quiet "mrr.", flicks its tail once,
    * then gets on with its day. The placeholder cat has no eyes, so the blink is a slow dip of the head.
    */
-  private offendedBlink(towardX?: number): void {
+  private offendedBlink(toward?: Point): void {
     this.mode = "busy";
     this.acting = true;
     this.cat.scaleY = 0.6; // still curled up from the nap
     this.tween({ targets: this.cat, scaleY: 1, duration: 250, ease: "Quad.easeOut" });
-    if (towardX !== undefined) this.turnTo(towardX);
+    if (toward) this.turnTo(toward);
     const blink = CAT_TIMING.offendedBlink;
-    this.tween({ targets: this.face, y: "+=2", duration: blink / 2, yoyo: true, delay: 300, ease: "Sine.easeInOut" }, () => {
+    this.tween({ targets: this.face, y: `+=${BLINK_DIP}`, duration: blink / 2, yoyo: true, delay: 300, ease: "Sine.easeInOut" }, () => {
       this.say(OFFENDED_LINE);
       this.tween({ targets: this.tail, angle: -30, duration: 110, yoyo: true, ease: "Quad.easeOut" });
     });
@@ -499,7 +546,7 @@ export class CatActor {
   }
 
   private finish(): void {
-    this.cat.setScale(this.facing, 1);
+    this.cat.setScale(facingSign(this.facing), 1);
     this.resetParts();
     this.bubble.setVisible(false);
     this.mode = "idle";
@@ -534,16 +581,21 @@ export class CatActor {
     this.visiting = undefined;
     this.acting = false;
     this.napRug = undefined;
-    this.cat.setScale(this.facing, 1);
+    this.cat.setScale(facingSign(this.facing), 1);
     this.cat.angle = 0;
     this.bubble.setVisible(false);
     this.pose = "resting";
   }
 
-  private turnTo(x: number): void {
-    if (Math.abs(x - this.cat.x) < 4) return;
-    this.facing = x < this.cat.x ? -1 : 1;
-    this.cat.scaleX = this.facing;
+  /** Faces `to` along its dominant axis (left/right on a tie); something right at its feet keeps the current way. */
+  private turnTo(to: Point): void {
+    this.setFacing(facingFor(to.x - this.cat.x, to.y - this.cat.y, this.facing, TURN_DEAD_ZONE));
+  }
+
+  private setFacing(facing: Facing): void {
+    if (facing === this.facing) return;
+    this.facing = facing;
+    this.drawFacing();
   }
 
   private nap(): void {
@@ -605,7 +657,7 @@ export class CatActor {
       onUpdate: (tween) => {
         if (off()) return;
         const t = tween.getValue() ?? 1;
-        view.setPosition(baseX + Math.sin(t * Math.PI * 6) * 3 * (1 - t), view.y);
+        view.setPosition(baseX + Math.sin(t * Math.PI * 6) * WOBBLE * (1 - t), view.y);
       },
       onComplete: () => {
         this.wobbling.delete(view);
@@ -633,25 +685,63 @@ export class CatActor {
     });
   }
 
-  /** A placeholder cat built from rectangles, drawn facing right with its feet at (0, 0). */
+  /** A placeholder cat built from rectangles, with its feet at (0, 0). `drawFacing` lays the parts out. */
   private makeCat(): {
     cat: Phaser.GameObjects.Container;
     tail: Phaser.GameObjects.Rectangle;
+    body: Phaser.GameObjects.Rectangle;
     face: Phaser.GameObjects.Rectangle[];
   } {
     const s = this.scene;
-    const shape = (x: number, y: number, w: number, h: number) =>
-      s.add.rectangle(x, y, w, h, COLOR_CAT).setOrigin(0.5, 1).setStrokeStyle(1.5, COLOR_OUTLINE);
-    const headX = BODY_W / 2 - 2;
-    const headBottom = -BODY_H + 3;
-    const tail = shape(-BODY_W / 2 - 1, -BODY_H + 3, 3, Math.round(TILE * 0.25));
-    const ear = Math.max(2, Math.round(HEAD / 3));
-    const face = [
-      shape(headX, headBottom, HEAD, HEAD), // head
-      shape(headX - ear, headBottom - HEAD + 1, ear, ear + 1), // ears
-      shape(headX + ear, headBottom - HEAD + 1, ear, ear + 1),
-    ];
-    return { cat: s.add.container(0, 0, [tail, shape(0, 0, BODY_W, BODY_H), ...face]), tail, face };
+    const shape = () => s.add.rectangle(0, 0, 1, 1, COLOR_CAT).setOrigin(0.5, 1).setStrokeStyle(1.5, COLOR_OUTLINE);
+    const tail = shape();
+    const body = shape();
+    const face = [shape(), shape(), shape()]; // head, then the ears
+    return { cat: s.add.container(0, 0, [tail, body, ...face]), tail, body, face };
+  }
+
+  /**
+   * Lays out the placeholder for the way it faces. Left and right: a side view with the head at the
+   * front (drawn facing right, flipped for left). Down: the head low and centered over the body, the
+   * tail rising behind it. Up: a small head peeking over the far end, the tail toward the viewer.
+   */
+  private drawFacing(): void {
+    const [head, ...ears] = this.face;
+    const place = (part: Phaser.GameObjects.Rectangle, x: number, bottom: number, w: number, h: number) =>
+      part.setPosition(x, bottom).setSize(w, h).setOrigin(0.5, 1);
+    this.scene.tweens.killTweensOf(this.face); // a blink mid-turn would put the face back in the old spot
+    let order: Phaser.GameObjects.Rectangle[];
+    if (this.facing === "left" || this.facing === "right") {
+      const headX = BODY_W / 2 - 2;
+      const headBottom = -BODY_H + 3;
+      place(this.body, 0, 0, BODY_W, BODY_H);
+      place(this.tail, -BODY_W / 2 - 1, -BODY_H + 3, TAIL_W, TAIL_L);
+      place(head, headX, headBottom, HEAD, HEAD);
+      ears.forEach((ear, i) => place(ear, headX + (i ? EAR : -EAR), headBottom - HEAD + 1, EAR, EAR + 1));
+      order = [this.tail, this.body, head, ...ears];
+    } else if (this.facing === "down") {
+      // The body reaches back (up the screen) from the head, which sits at the cat's front edge.
+      const bodyBottom = -2;
+      const headBottom = 1;
+      place(this.body, 0, bodyBottom, FRONT_W, FRONT_H);
+      place(this.tail, FRONT_W / 2 - 3, bodyBottom - FRONT_H + 2, TAIL_W, TAIL_L);
+      place(head, 0, headBottom, HEAD + 1, HEAD);
+      ears.forEach((ear, i) => place(ear, i ? EAR : -EAR, headBottom - HEAD + 1, EAR, EAR + 1));
+      order = [this.tail, this.body, head, ...ears];
+    } else {
+      // The head sits behind the body, so only its top and the ears show over the far end.
+      const small = HEAD - 2;
+      const headBottom = -FRONT_H + 3;
+      place(this.body, 0, 0, FRONT_W, FRONT_H);
+      place(head, 0, headBottom, small, small);
+      ears.forEach((ear, i) => place(ear, i ? EAR - 1 : 1 - EAR, headBottom - small + 1, EAR, EAR + 1));
+      // Hanging from its base toward the viewer, so a flick swings the tip.
+      place(this.tail, 2, -4, TAIL_W, TAIL_L - 1).setOrigin(0.5, 0);
+      order = [...ears, head, this.body, this.tail];
+    }
+    for (const part of order) this.cat.bringToTop(part);
+    this.cat.scaleX = facingSign(this.facing);
+    this.faceY = this.face.map((part) => part.y);
   }
 }
 

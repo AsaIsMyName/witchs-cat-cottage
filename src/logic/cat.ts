@@ -43,6 +43,31 @@ export type IdlePlan =
 
 const IDLE_ACTIONS: IdleAction[] = ["sit", "groom", "nap"];
 
+/** Which way the cat faces in the ¾ view: up is away from the viewer (toward the wall), down is toward them. */
+export type Facing = "up" | "down" | "left" | "right";
+
+/**
+ * The way to face for a move or look of (dx, dy) in screen px (y grows down): the dominant axis,
+ * left/right on a tie. Within `deadZone` px on both axes (e.g. no movement), it keeps `current`.
+ */
+export function facingFor(dx: number, dy: number, current: Facing, deadZone = 0): Facing {
+  if (Math.abs(dx) <= deadZone && Math.abs(dy) <= deadZone) return current;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx < 0 ? "left" : "right";
+  return dy < 0 ? "up" : "down";
+}
+
+/** A unit step in the facing direction, in screen axes (y grows down), e.g. for a nudge toward what it faces. */
+export function facingStep(facing: Facing): { x: number; y: number } {
+  if (facing === "left") return { x: -1, y: 0 };
+  if (facing === "right") return { x: 1, y: 0 };
+  return { x: 0, y: facing === "up" ? -1 : 1 };
+}
+
+/** The horizontal sign for flipping a side view: -1 facing left, else 1 (up and down are drawn unflipped). */
+export function facingSign(facing: Facing): 1 | -1 {
+  return facing === "left" ? -1 : 1;
+}
+
 export function reactionFor(catalog: TaggedCatalog, state: RoomState, p: Placement, rules: ReactionRule[]): Reaction {
   const item = catalog[p.itemId];
   if (!item) return "sniff";

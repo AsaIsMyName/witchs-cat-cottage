@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { changedItems, displaced, movedOrRemoved, pickIdle, slotSide, toBack, reactionFor, type CatBehavior, type TaggedCatalog } from "./cat";
+import {
+  changedItems,
+  displaced,
+  facingFor,
+  facingSign,
+  facingStep,
+  movedOrRemoved,
+  pickIdle,
+  slotSide,
+  toBack,
+  reactionFor,
+  type CatBehavior,
+  type TaggedCatalog,
+} from "./cat";
 import { emptyRoom, moveItem, placeFromTray, removeToTray, type RoomShape, type RoomState, type Target } from "./grid";
 
 const room: RoomShape = { columns: 12, wallRows: 3, floorRows: 3 };
@@ -100,6 +113,52 @@ describe("pickIdle", () => {
     ]);
     expect(pickIdle(catalog, s, room, behavior, scripted(0.1, 0))).toEqual({ kind: "visit", uid: "p2", reaction: "nap" });
     expect(pickIdle(catalog, s, room, behavior, scripted(0.9, 0, 0, 0)).kind).toBe("wander");
+  });
+
+  it("wanders across the whole of a 16×9 floor, not just the old 3 rows", () => {
+    const big: RoomShape = { columns: 16, wallRows: 2, floorRows: 9 };
+    expect(pickIdle(catalog, emptyRoom({}), big, behavior, scripted(0.999, 0.999, 0))).toMatchObject({ col: 15, row: 8 });
+    expect(pickIdle(catalog, emptyRoom({}), big, behavior, scripted(0, 0.5, 0))).toMatchObject({ col: 0, row: 4 });
+  });
+});
+
+describe("facingFor", () => {
+  it("faces along a straight move", () => {
+    expect(facingFor(10, 0, "down")).toBe("right");
+    expect(facingFor(-10, 0, "down")).toBe("left");
+    expect(facingFor(0, -10, "down")).toBe("up");
+    expect(facingFor(0, 10, "up")).toBe("down");
+  });
+
+  it("uses the dominant axis on a diagonal", () => {
+    expect(facingFor(20, -5, "down")).toBe("right");
+    expect(facingFor(-5, -20, "down")).toBe("up");
+    expect(facingFor(3, 32, "left")).toBe("down");
+    expect(facingFor(-32, 31, "up")).toBe("left");
+  });
+
+  it("prefers left or right on a tie", () => {
+    expect(facingFor(16, 16, "up")).toBe("right");
+    expect(facingFor(-16, -16, "down")).toBe("left");
+    expect(facingFor(-16, 16, "up")).toBe("left");
+  });
+
+  it("keeps the current way with no movement, or inside the dead zone", () => {
+    expect(facingFor(0, 0, "up")).toBe("up");
+    expect(facingFor(0, 0, "left")).toBe("left");
+    expect(facingFor(3, -2, "down", 4)).toBe("down");
+    expect(facingFor(5, -2, "down", 4)).toBe("right");
+    expect(facingFor(1, -6, "down", 4)).toBe("up");
+  });
+});
+
+describe("facingStep and facingSign", () => {
+  it("step toward what the cat faces, and flip only when facing left", () => {
+    expect(facingStep("left")).toEqual({ x: -1, y: 0 });
+    expect(facingStep("right")).toEqual({ x: 1, y: 0 });
+    expect(facingStep("up")).toEqual({ x: 0, y: -1 });
+    expect(facingStep("down")).toEqual({ x: 0, y: 1 });
+    expect([facingSign("left"), facingSign("right"), facingSign("up"), facingSign("down")]).toEqual([-1, 1, 1, 1]);
   });
 });
 

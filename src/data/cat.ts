@@ -42,14 +42,15 @@ export const OFFENDED_LINE = "mrr.";
 
 /** Pacing, in milliseconds unless noted. */
 export const CAT_TIMING = {
-  // Speeds and the hop arc are in screen px, at 32px tiles (about 2 tiles a second on the floor).
-  walkSpeed: 64, // px per second
+  // Speeds and the hop arc are in tiles, so they hold at any tile size (the scene multiplies by TILE).
+  // The same pace as the old 48px-tile version: 90 and 60 px/s there.
+  walkSpeed: 1.875, // tiles per second: a cozy stroll (60 px/s at 32px tiles)
   /** Crossing furniture with a top: slower up there, a short arcing hop on and off. */
-  topWalkSpeed: 40, // px per second
+  topWalkSpeed: 1.25, // tiles per second (40 px/s)
   hop: 400,
   /** Hopping straight down because its perch was moved or removed. */
   hopDown: 350,
-  hopArc: 4, // px the cat rises above a straight line mid-hop
+  hopArc: 0.16, // tiles the cat rises above a straight line mid-hop (5px)
   /** Route cost (in steps) of each hop up onto furniture, so the cat prefers walking around. */
   climbCost: 4,
   /** Extra route cost of hopping on or off from behind or in front, so it prefers the side. */
