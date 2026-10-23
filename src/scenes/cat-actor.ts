@@ -2,54 +2,23 @@
 // Decisions come from src/logic/cat.ts; this file only animates them.
 
 import * as Phaser from "phaser";
-import {
-  BOOK_REACTION_LINES,
-  BOOK_REACTION_RULES,
-  CAT_BEHAVIOR,
-  CAT_TIMING,
-  DIVE,
-  DIVE_LINE,
-  IDLE_LINES,
-  OFFENDED_LINE,
-  PET_LINE,
-  REACTION_LINES,
-} from "../data/cat";
+import { CAT_BEHAVIOR, CAT_TIMING, IDLE_LINES, OFFENDED_LINE, PET_LINE, REACTION_LINES } from "../data/cat";
 import { CATALOG } from "../data/items";
-import { MAGIC_FX } from "../data/magic";
 import { BEDROOM } from "../data/rooms";
 import {
-  bookReactionFor,
   changedItems,
   displaced,
   movedOrRemoved,
-  nextActivity,
-  nextDiveAt,
   pickIdle,
   reactionFor,
   slotSide,
   toBack,
-  type BookReaction,
   type IdleAction,
   type Reaction,
 } from "../logic/cat";
 import type { RoomState } from "../logic/grid";
-import { canStand, nearestFreeTile, planWalk, type Leg, type Tile } from "../logic/route";
-import { openPortal, sparkle } from "./magic-fx";
-import {
-  BOOK_PAGES,
-  DEPTH_BOOK_CAT,
-  DEPTH_FLOOR,
-  FLOOR_Y,
-  GAME_HEIGHT,
-  GAME_WIDTH,
-  ItemView,
-  ROOM_X,
-  TEXT_LIGHT,
-  TILE,
-  pageItemArea,
-  textStyle,
-  type Box,
-} from "./room-view";
+import { canStand, planWalk, type Leg, type Tile } from "../logic/route";
+import { DEPTH_FLOOR, FLOOR_Y, GAME_WIDTH, ItemView, ROOM_X, TEXT_LIGHT, TILE, textStyle } from "./room-view";
 
 const BODY_W = 30;
 const BODY_H = 14;
@@ -59,12 +28,6 @@ const COLOR_OUTLINE = 0x1e1a2b;
 const COLOR_HEART = "#f28fb0";
 const DEPTH_BUBBLE = 950;
 const BUBBLE_OFFSET = BODY_H + HEAD + 8;
-/** The cat's drawn extent around its feet at full size (tail to nose, feet to ear tips, with outlines). */
-const CAT_HALF_W = 21;
-const CAT_H = 27;
-/** The floor row nearest the book, where dives start and end. */
-const FRONT_ROW = BEDROOM.floorRows - 1;
-const ALL_ROWS = Array.from({ length: BEDROOM.floorRows }, (_, row) => row);
 
 /** idle: doing its own thing. busy: reacting to an item or being petted. */
 type Mode = "idle" | "busy";
@@ -116,34 +79,14 @@ export class CatActor {
   /** Item views the player is holding; wobbles leave them alone. */
   private readonly held = new Set<ItemView>();
   private readonly wobbling = new Set<ItemView>();
-  private readonly faceX: number[];
-  /** The cat's overall size: 1 in the room, `DIVE.floatScale` in the book. Flips and squashes build on it. */
-  private size = 1;
-  /** Play time in ms, counted only while the tab is visible. A dive is due once it reaches `diveDueAt`. */
-  private playTime = 0;
-  private diveDueAt = nextDiveAt(0, DIVE.every, Math.random);
-  /**
-   * A portal dive in progress. `tile` is the floor tile it leaves from and comes back to; `away`
-   * is true from the moment it starts sinking until it's back in the room.
-   */
-  private dive?: { tile: Tile; away: boolean };
-  /** While the cat is in the book: the point its feet drift through, before the bob. */
-  private float?: Point;
-  private drift?: Phaser.Tweens.Tween;
 
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly getState: () => RoomState,
     private readonly getViews: () => Map<string, ItemView>,
-    /** The spellbook's item views. The floating cat only ever reads where they are, never moves them. */
-    private readonly getBookViews: () => ItemView[],
   ) {
     ({ cat: this.cat, tail: this.tail, face: this.face } = this.makeCat());
     this.faceY = this.face.map((part) => part.y);
-    this.faceX = this.face.map((part) => part.x);
-    const tick = (_time: number, delta: number) => this.tick(delta);
-    scene.events.on("update", tick);
-    scene.events.once("shutdown", () => scene.events.off("update", tick));
     const start = floorPoint(Phaser.Math.Between(2, BEDROOM.columns - 3), BEDROOM.floorRows - 1);
     this.cat.setPosition(start.x, start.y);
     this.updateDepth();
@@ -212,22 +155,8 @@ export class CatActor {
 
   /** Generous hit area so the small cat is easy to tap on a phone. */
   hitTest(x: number, y: number): boolean {
-    if (this.cat.alpha < 0.5) return false; // mostly through a portal: nothing there to pet
-    const s = this.size;
-    const halfW = (BODY_W / 2 + HEAD) * s;
-    return Math.abs(x - this.cat.x) <= halfW && y <= this.cat.y + 6 * s && y >= this.cat.y - (BODY_H + HEAD + 10) * s;
-  }
-
-  /**
-   * Dev trigger: the next dive is due now. A cat waiting between activities dives straight away
-   * (after any queued visits); one that's busy dives once it's free.
-   */
-  diveSoon(): void {
-    this.diveDueAt = this.playTime;
-    const waiting = this.mode === "idle" && this.pose === "resting" && !this.acting && !this.move && !this.dive;
-    if (!waiting) return;
-    this.interrupt(); // nothing is in progress, so this only drops the pending "what next" timer
-    this.next();
+    const halfW = BODY_W / 2 + HEAD;
+    return Math.abs(x - this.cat.x) <= halfW && y <= this.cat.y + 6 && y >= this.cat.y - (BODY_H + HEAD + 10);
   }
 
   /**
@@ -292,31 +221,20 @@ export class CatActor {
     if (this.move) this.move.timeScale = scale;
   }
 
-  /** The cat is free to pick what's next: queued visits first, then a dive if one is due, else an idle activity. */
   private next(): void {
     const state = this.getState();
     const views = this.getViews();
-    // Drop queued items that have gone, so they don't hold up a dive.
-    const live = this.queue.filter((uid) => views.has(uid) && state.placements.some((p) => p.uid === uid));
-    this.queue.splice(0, this.queue.length, ...live);
-
-    const activity = nextActivity(this.queue.length, this.playTime, this.diveDueAt);
-    if (activity === "visit") {
+    while (this.queue.length > 0) {
       const uid = this.queue.shift()!;
-      const placement = state.placements.find((p) => p.uid === uid)!;
+      const placement = state.placements.find((p) => p.uid === uid);
+      if (!placement || !views.has(uid)) continue;
       this.mode = "busy";
       this.current = uid;
       this.visiting = uid;
       this.visit(uid, reactionFor(CATALOG, state, placement, CAT_BEHAVIOR.rules), CAT_TIMING.reactionLength);
       return;
     }
-    if (activity === "dive") return this.startDive();
-    this.idle();
-  }
 
-  private idle(): void {
-    const state = this.getState();
-    const views = this.getViews();
     this.mode = "idle";
     const plan = pickIdle(CATALOG, state, BEDROOM, CAT_BEHAVIOR, Math.random);
     if (plan.kind === "wander") this.wander(plan.col, plan.row, plan.action);
@@ -365,197 +283,6 @@ export class CatActor {
       else this.tween({ targets: this.cat, y: this.cat.y - 2, duration: 200, yoyo: true, repeat: 3 });
       this.later(action === "nap" ? between(CAT_TIMING.napLength) : between(CAT_TIMING.idleGap), () => this.finish());
     });
-  }
-
-  /**
-   * Portal dive, step 1: walk (routed as usual) to the free front-row tile nearest the cat, the row
-   * nearest the book. If the whole front row is taken, it skips this dive and idles instead.
-   */
-  private startDive(): void {
-    const tile = nearestFreeTile(BEDROOM, CATALOG, this.getState(), this.tileHere(), [FRONT_ROW]);
-    if (!tile) {
-      this.diveDueAt = nextDiveAt(this.playTime, DIVE.every, Math.random);
-      return this.idle();
-    }
-    this.mode = "busy";
-    this.dive = { tile, away: false };
-    this.walkTo(floorPoint(tile.col, tile.row), () => this.sinkIntoFloor());
-  }
-
-  /** "meow!", then a small portal opens under it and it shrinks and fades down into the ring. */
-  private sinkIntoFloor(): void {
-    this.dive = { tile: this.tileHere(), away: true };
-    this.acting = true;
-    this.say(DIVE_LINE);
-    this.later(DIVE.meowFor, () => {
-      openPortal(this.scene, this.cat.x, this.cat.y - 2, { ...MAGIC_FX.catPortal, depth: this.cat.depth - 1 });
-      this.resize({ size: [1, 0], alpha: [1, 0], duration: DIVE.sink, drop: DIVE.sinkDrop }, () => {
-        this.bubble.setVisible(false);
-        this.enterBook();
-      });
-    });
-  }
-
-  /**
-   * Comes out of a portal on one spellbook page at `DIVE.floatScale`, drawn behind the book's
-   * items. It floats lazily behind one item on that page (or just floats, if the page is empty),
-   * reacts to it by its tags, then drifts on and sinks into another page portal. Book items are
-   * only read for where they are and what they're tagged: never moved, scaled, or touched.
-   */
-  private enterBook(): void {
-    const page = BOOK_PAGES[Math.floor(Math.random() * BOOK_PAGES.length)];
-    const area = pageItemArea(page);
-    const s = DIVE.floatScale;
-    const onPage = this.getBookViews().filter((v) => v.alive && v.centerX >= page.x && v.centerX < page.x + page.w);
-    const item = onPage.length > 0 ? onPage[Math.floor(Math.random() * onPage.length)] : undefined;
-    const reaction = item && bookReactionFor(item.def.tags, BOOK_REACTION_RULES);
-    // Behind an item: feet at its visible bottom, so the item covers most of the cat.
-    const visit = floatPoint(area, item ? { x: item.centerX, y: item.top + item.box.h } : randomIn(area), s);
-    const start = floatPoint(area, randomIn(area), s);
-    const exit = floatPoint(area, randomIn(area), s);
-    const drift = Math.max(800, (between(DIVE.floatLength) - DIVE.emerge - DIVE.bookReactionLength - DIVE.sink) / 2);
-
-    this.float = { ...start };
-    this.size = 0;
-    this.cat.setScale(0).setAlpha(0);
-    this.cat.setPosition(start.x, start.y);
-    this.updateDepth();
-    openPortal(this.scene, start.x, start.y - 6, { ...MAGIC_FX.catPortal, depth: DEPTH_BOOK_CAT - 1 });
-    this.resize({ size: [0, s], alpha: [0, 1], duration: DIVE.emerge }, () => {
-      this.floatSparkle();
-      this.driftTo(visit, drift, () => {
-        if (reaction) this.bookReact(reaction);
-        this.later(DIVE.bookReactionLength, () => {
-          this.resetParts();
-          this.cat.setScale(this.facing * this.size, this.size);
-          this.bubble.setVisible(false);
-          this.driftTo(exit, drift, () => this.leaveBook());
-        });
-      });
-    });
-  }
-
-  /** A small reaction to a book item, done with the cat's own body only. */
-  private bookReact(reaction: BookReaction): void {
-    this.say(BOOK_REACTION_LINES[reaction]);
-    this.floatSparkle();
-    const s = this.size;
-    switch (reaction) {
-      case "paw-air":
-        this.tween({ targets: this.cat, scaleY: s * 1.3, duration: 220, yoyo: true, repeat: 2 });
-        break;
-      case "blink":
-        this.tween({ targets: this.face, y: "+=2", duration: 450, yoyo: true, delay: 200, ease: "Sine.easeInOut" });
-        break;
-      case "stare":
-        // Ears perk up and stay up while it stares.
-        this.tween({ targets: this.face.slice(1), y: "-=2", duration: 120, yoyo: true, hold: 1000 });
-        break;
-      case "curl":
-        this.tween({ targets: this.cat, scaleY: s * 0.7, duration: 300, yoyo: true, hold: 900 });
-        break;
-      case "sniff":
-        this.tween({ targets: this.face, x: "+=2", duration: 120, yoyo: true, repeat: 3 });
-        break;
-    }
-  }
-
-  /** Drifts the floating cat's feet to `to`; `tick` adds the bob. */
-  private driftTo(to: Point, duration: number, then: () => void): void {
-    if (!this.float) return;
-    this.turnTo(to.x);
-    this.drift = this.tween({ targets: this.float, x: to.x, y: to.y, duration, ease: "Sine.easeInOut" }, () => {
-      this.drift = undefined;
-      then();
-    });
-  }
-
-  private floatSparkle(): void {
-    sparkle(this.scene, this.cat.x, this.cat.y - CAT_H * this.size * 0.5, {
-      count: DIVE.sparkleCount,
-      depth: DEPTH_BOOK_CAT + 1,
-    });
-  }
-
-  /** Sinks into a page portal, then comes back out in the room. */
-  private leaveBook(): void {
-    if (!this.float) return;
-    openPortal(this.scene, this.float.x, this.float.y - 6, { ...MAGIC_FX.catPortal, depth: DEPTH_BOOK_CAT - 1 });
-    this.resize({ size: [this.size, 0], alpha: [1, 0], duration: DIVE.sink }, () => this.returnToRoom());
-  }
-
-  /**
-   * A floor portal opens at the tile it left from (or the nearest free one, if that's taken now),
-   * and it hops back out at full size, then carries on with its usual day.
-   */
-  private returnToRoom(): void {
-    this.landFromDive(false);
-    openPortal(this.scene, this.cat.x, this.cat.y - 2, { ...MAGIC_FX.catPortal, depth: this.cat.depth - 1 });
-    this.resize({ size: [0, 1], alpha: [0, 1], duration: DIVE.hopOut, arc: DIVE.hopOutArc }, () => {
-      this.dive = undefined;
-      this.diveDueAt = nextDiveAt(this.playTime, DIVE.every, Math.random);
-      this.bringGift();
-      this.finish();
-    });
-  }
-
-  /**
-   * Gift hook for milestone 5 (CLAUDE.md, "Earning and unlocks"): after a dive, the cat will
-   * sometimes bring back an item or some coins. It produces nothing yet.
-   */
-  private bringGift(): void {}
-
-  /**
-   * Puts the cat back in the room on its exit tile at room depth, out of the book: on a normal
-   * return (still invisible, about to hop out), or `visible` at full size if a dive is cut short.
-   */
-  private landFromDive(visible: boolean): void {
-    this.drift?.remove();
-    this.drift = undefined;
-    this.float = undefined;
-    const state = this.getState();
-    const left = this.dive?.tile ?? this.tileHere();
-    const tile = canStand(BEDROOM, CATALOG, state, left)
-      ? left
-      : (nearestFreeTile(BEDROOM, CATALOG, state, left, [FRONT_ROW]) ??
-        nearestFreeTile(BEDROOM, CATALOG, state, left, ALL_ROWS) ??
-        left);
-    const p = floorPoint(tile.col, tile.row);
-    this.size = visible ? 1 : 0;
-    this.cat.setPosition(p.x, p.y).setScale(this.facing * this.size, this.size).setAlpha(visible ? 1 : 0);
-    this.updateDepth();
-  }
-
-  /**
-   * Grows or shrinks the cat around its feet, fading it, over `duration`. In the room it also sinks
-   * `drop` px or rises in an `arc`; in the book `tick` places it.
-   */
-  private resize(
-    o: { size: [number, number]; alpha: [number, number]; duration: number; drop?: number; arc?: number },
-    then: () => void,
-  ): void {
-    const token = this.token;
-    const baseY = this.cat.y;
-    const progress = { t: 0 };
-    const onUpdate = () => {
-      if (token !== this.token) return; // interrupted: the cat has already been put back
-      const t = progress.t;
-      this.size = Phaser.Math.Linear(o.size[0], o.size[1], t);
-      this.cat.setScale(this.facing * this.size, this.size).setAlpha(Phaser.Math.Linear(o.alpha[0], o.alpha[1], t));
-      if (!this.float) this.cat.y = baseY + (o.drop ?? 0) * t - 4 * t * (1 - t) * (o.arc ?? 0);
-      this.followBubble();
-    };
-    this.tween({ targets: progress, t: 1, duration: o.duration, ease: "Sine.easeInOut", onUpdate }, then);
-  }
-
-  /** Every frame: counts play time while the tab is visible, and bobs the cat while it floats in the book. */
-  private tick(delta: number): void {
-    if (document.visibilityState === "visible") this.playTime += delta;
-    if (!this.float) return;
-    const { height, period } = DIVE.bob;
-    const bob = Math.sin((this.playTime / period) * Math.PI * 2) * height;
-    this.cat.setPosition(this.float.x, this.float.y + bob);
-    this.followBubble();
   }
 
   private react(reaction: Reaction, view: ItemView): void {
@@ -769,8 +496,7 @@ export class CatActor {
   }
 
   private finish(): void {
-    this.size = 1;
-    this.cat.setScale(this.facing, 1).setAlpha(1);
+    this.cat.setScale(this.facing, 1);
     this.resetParts();
     this.bubble.setVisible(false);
     this.mode = "idle";
@@ -805,15 +531,7 @@ export class CatActor {
     this.visiting = undefined;
     this.acting = false;
     this.napRug = undefined;
-    // Cut off mid-dive: never left in the book, shrunk, or invisible. Back on its exit tile, and the
-    // next dive is a while off. (Cut off on the walk there, it simply dives at its next free moment.)
-    if (this.dive?.away) {
-      this.landFromDive(true);
-      this.diveDueAt = nextDiveAt(this.playTime, DIVE.every, Math.random);
-    }
-    this.dive = undefined;
-    this.size = 1;
-    this.cat.setScale(this.facing, 1).setAlpha(1);
+    this.cat.setScale(this.facing, 1);
     this.cat.angle = 0;
     this.bubble.setVisible(false);
     this.pose = "resting";
@@ -822,7 +540,7 @@ export class CatActor {
   private turnTo(x: number): void {
     if (Math.abs(x - this.cat.x) < 4) return;
     this.facing = x < this.cat.x ? -1 : 1;
-    this.cat.scaleX = this.facing * this.size;
+    this.cat.scaleX = this.facing;
   }
 
   private nap(): void {
@@ -840,25 +558,18 @@ export class CatActor {
     this.followBubble();
   }
 
-  /**
-   * Keeps a visible speech bubble above the cat, e.g. a purr while it walks, and inside the screen.
-   * It sits lower over the smaller floating cat, but doesn't sink into a portal with it.
-   */
+  /** Keeps a visible speech bubble above the cat, e.g. a purr while it walks. */
   private followBubble(): void {
     if (!this.bubble.visible) return;
     const half = this.bubble.width / 2;
-    const y = this.cat.y - BUBBLE_OFFSET * Math.max(this.size, DIVE.floatScale);
-    this.bubble.setPosition(
-      Phaser.Math.Clamp(this.cat.x, half + 4, GAME_WIDTH - half - 4),
-      Phaser.Math.Clamp(y, this.bubble.height + 2, GAME_HEIGHT - 2),
-    );
+    this.bubble.setPosition(Phaser.Math.Clamp(this.cat.x, half + 4, GAME_WIDTH - half - 4), this.cat.y - BUBBLE_OFFSET);
   }
 
-  /** Puts the tail and head back after a wiggle, flick, blink, or sniff. */
+  /** Puts the tail and head back after a wiggle, flick, or blink. */
   private resetParts(): void {
     this.scene.tweens.killTweensOf([this.tail, ...this.face]);
     this.tail.angle = 0;
-    this.face.forEach((part, i) => part.setPosition(this.faceX[i], this.faceY[i]));
+    this.face.forEach((part, i) => (part.y = this.faceY[i]));
   }
 
   private floatHeart(): void {
@@ -869,9 +580,7 @@ export class CatActor {
     this.scene.tweens.add({ targets: heart, y: heart.y - 24, alpha: 0, duration: 900, onComplete: () => heart.destroy() });
   }
 
-  /** Room depth from its row or perch; in the book, behind the book's items. */
   private updateDepth(): void {
-    if (this.float) return void this.cat.setDepth(DEPTH_BOOK_CAT);
     const host = this.perch && this.getViews().get(this.perch.uid);
     this.cat.setDepth(host ? host.body.depth + 3 : depthAt(this.cat.y));
   }
@@ -969,23 +678,6 @@ function nearestTileOf(view: ItemView, x: number): Tile {
 /** Floor depth for a cat standing at `y`: in front of items in its row, behind rows nearer the front. */
 function depthAt(y: number): number {
   return DEPTH_FLOOR + rowAt(y) * 10 + 5;
-}
-
-/**
- * Where the floating cat's feet may go so that all of it, at `scale` and with its bob, stays inside
- * a page's item area: `p`, clamped.
- */
-function floatPoint(area: Box, p: Point, scale: number): Point {
-  const halfW = CAT_HALF_W * scale;
-  const bob = DIVE.bob.height;
-  return {
-    x: Phaser.Math.Clamp(p.x, area.x + halfW, area.x + area.w - halfW),
-    y: Phaser.Math.Clamp(p.y, area.y + CAT_H * scale + bob, area.y + area.h - bob),
-  };
-}
-
-function randomIn(area: Box): Point {
-  return { x: area.x + Math.random() * area.w, y: area.y + Math.random() * area.h };
 }
 
 function between([min, max]: number[]): number {

@@ -18,7 +18,7 @@ import { openPortal, popIn, sendBack, sparkle } from "./magic-fx";
 import { loadRoom, saveRoom } from "./room-store";
 import {
   BOOK_PAGES,
-  DEPTH_BOOK_ITEMS,
+  DEPTH_FLOOR,
   FLOOR_Y,
   GAME_HEIGHT,
   GAME_WIDTH,
@@ -67,8 +67,6 @@ export class DecorateScene extends Phaser.Scene {
   private state!: RoomState;
   private readonly views: ItemView[] = [];
   private placedViews = new Map<string, ItemView>();
-  /** The views in the spellbook, so the floating cat can find one to drift behind. */
-  private trayViews: ItemView[] = [];
   private readonly sources = new Map<Phaser.GameObjects.GameObject, { view: ItemView; source: DragSource }>();
   private trayLabels: Phaser.GameObjects.Text[] = [];
   private highlight!: Phaser.GameObjects.Graphics;
@@ -100,24 +98,11 @@ export class DecorateScene extends Phaser.Scene {
     this.input.on("dragend", this.onDragEnd, this);
     this.input.on("pointerdown", () => (this.dragged = false));
     this.input.on("pointerup", (pointer: Phaser.Input.Pointer) => {
-      if (this.dragged || !this.cat.hitTest(pointer.worldX, pointer.worldY)) return;
-      // The cat floats behind the book's items, so a tap on one of those is about the item, not the cat.
-      const onBookItem = this.input.hitTestPointer(pointer).some((obj) => this.sources.get(obj)?.source.kind === "tray");
-      if (!onBookItem) this.cat.pet();
+      if (!this.dragged && this.cat.hitTest(pointer.worldX, pointer.worldY)) this.cat.pet();
     });
     this.addResetButton();
     this.renderItems();
-    this.cat = new CatActor(this, () => this.state, () => this.placedViews, () => this.trayViews);
-    // Dev builds only (`npm run dev`): makes the cat dive at its next free moment. Production builds drop this block.
-    if (import.meta.env.DEV) {
-      this.add
-        .text(GAME_WIDTH - 6, WALL_Y, "✦ dive", textStyle(10, TEXT_MUTED))
-        .setOrigin(1, 0)
-        .setPadding(4, 4, 4, 4)
-        .setDepth(DEPTH_BOOK_ITEMS)
-        .setInteractive({ useHandCursor: true })
-        .on("pointerup", () => this.cat.diveSoon());
-    }
+    this.cat = new CatActor(this, () => this.state, () => this.placedViews);
   }
 
   /**
@@ -142,7 +127,6 @@ export class DecorateScene extends Phaser.Scene {
       .text(page.x + page.w + RESET_PADDING, TRAY_HEADING_Y - 4, "reset room", textStyle(10, TEXT_MUTED))
       .setOrigin(1, 0)
       .setPadding(RESET_PADDING, 4, RESET_PADDING, 4)
-      .setDepth(DEPTH_BOOK_ITEMS)
       .setInteractive({ useHandCursor: true });
     this.resetButton.on("pointerup", this.onResetTap, this);
   }
@@ -176,22 +160,18 @@ export class DecorateScene extends Phaser.Scene {
 
     const trayItems = ITEMS.filter((item) => (this.state.inventory[item.id] ?? 0) > 0);
     const trayViews = trayItems.map((item) => this.addView(item, { kind: "tray", itemId: item.id }));
-    this.trayViews = trayViews;
     // Left page first, then the right, each row centered on its page.
     const pages = BOOK_PAGES.map(pageItemArea);
     const xs = layoutTrayRow(trayViews.map((v) => v.trayWidth), pages, TRAY_GAP);
     trayViews.forEach((view, i) => {
       const x = xs[i];
       view.setPosition(x, view.footprintYForBottom(TRAY_ITEM_BOTTOM));
-      view.setDepth(DEPTH_BOOK_ITEMS);
+      view.setDepth(DEPTH_FLOOR);
       const count = this.state.inventory[view.def.id] ?? 0;
       if (count > 1) {
         const countY = TRAY_ITEM_BOTTOM + TRAY_COUNT_GAP;
         this.trayLabels.push(
-          this.add
-            .text(x + view.trayWidth / 2, countY, `×${count}`, textStyle(10, TEXT_MUTED))
-            .setOrigin(0.5, 0)
-            .setDepth(DEPTH_BOOK_ITEMS),
+          this.add.text(x + view.trayWidth / 2, countY, `×${count}`, textStyle(10, TEXT_MUTED)).setOrigin(0.5, 0),
         );
       }
     });

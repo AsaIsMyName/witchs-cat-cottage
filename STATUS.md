@@ -1,48 +1,5 @@
 # Status
 
-## Oct 22, 2026 — Milestone 3b: the cat's portal dive (awaiting playtest)
-
-**Done**
-- Now and then the cat dives into a portal, floats around a spellbook page behind its items, reacts to one item, and hops back out into the room. CLAUDE.md "Portal moments" now describes the concrete behaviour.
-- Timing (`src/logic/cat.ts`, tested):
-  - `nextActivity(queued, playTime, diveDueAt)`: queued visits first, then a dive once due, else idle. `next()` asks it where it used to go straight to `pickIdle`, so a dive only starts when the cat is free.
-  - `nextDiveAt(playTime, range, random)`: the next dive is 60–120s of play time later. Drawn at scene start and after every dive.
-  - Play time is counted per frame from the scene's update delta, only while `document.visibilityState` is visible (Phaser also stops its loop on a hidden tab).
-- Sequence (`cat-actor.ts`):
-  - Walks (routed) to the free front-row tile nearest it (new pure `nearestFreeTile` in `route.ts`, tested). If the whole front row is taken, it skips this dive and idles.
-  - Says "meow!", a floor portal opens under it (`openPortal` now takes duration, radius, and depth), and it shrinks, fades, and sinks 6px into the ring.
-  - Comes out of a page portal at 0.8 scale on a random page. Its path stays inside `pageItemArea` of that page (clamped for its size and bob). It drifts behind one random item on the page, reacts (`bookReactionFor`, tested: shiny paws at the air, warm slow blink, spooky ears perk, soft curl-up, else sniff), drifts on, and sinks into another page portal. A couple of small sparkles, drawn behind the items too. Total float about 6–8s. On an empty page it just floats.
-  - Book items are only read (position and tags), never moved, scaled, or touched.
-  - Back out of a floor portal at the tile it left from, or the nearest free front-row tile (then any row) if that's taken now. Full size, then `finish()` and the normal idle loop.
-  - `bringGift()` is an empty hook for milestone 5's gifts.
-- Depth: the floating cat is at `DEPTH_BOOK_CAT` (5), above the book's drawing (0) and below its items, ×N counts, heading, and "reset room", which all moved to `DEPTH_BOOK_ITEMS` (100, as the tray items already were). `updateDepth()` returns book depth only while floating, and room depth once it's back.
-- Taps: the cat isn't interactive, so drags from the book work as normal while it floats. On pointerup, DecorateScene no longer pets the cat if a book item is under the pointer. Tapping the floating cat elsewhere gets a heart only (it's busy). `hitTest` scales with the cat and ignores it while it's mostly through a portal.
-- Room changes while it's away queue as usual. It has no perch, rug, or visit target while diving, so `roomChanged` only queues.
-- Interrupts: if anything ever interrupts a dive once it's started sinking, `interrupt()` puts the cat back on its exit tile at full scale, alpha 1, and room depth (`landFromDive`), and draws the next due time. Cut off on the walk there, it just dives at its next free moment. Scale/alpha tweens are token-guarded, `finish()` and `interrupt()` restore scale and alpha, and `resetParts()` now also restores face x (for the sniff).
-- Speech bubble is clamped in y as well as x, and sits lower over the smaller floating cat.
-- Dev-only "✦ dive" button, top-right in the margin beside the room, inside `if (import.meta.env.DEV)`: the next dive is due now, and a cat waiting between activities dives right away (after queued visits). `npm run build` output doesn't contain it (grepped dist for the label and ✦).
-- Data in `src/data/cat.ts` (`DIVE`, `DIVE_LINE`, `BOOK_REACTION_RULES`, `BOOK_REACTION_LINES`) and `src/data/magic.ts` (`catPortal`).
-- 164 unit tests pass (10 new). Save format unchanged.
-
-**Not verified**
-- Not run in a real browser; `npm run check` can't check movement, depth, or taps.
-- The speech bubble stays at bubble depth, so a reaction line in the book can briefly overlap an item (it isn't interactive and doesn't block drags).
-
-**Re-test** (use "✦ dive" in `npm run dev`)
-- Does the dive read: walk to the front row, "meow!", sink into the ring, pop out on a page?
-- Is the floating cat clearly behind the book's items and counts, and never outside the page?
-- Does it drift behind one item and do a small reaction that suits it, with the item never moving?
-- While it floats: drag items out of the book (it keeps floating); tap a book item over the cat (no heart); tap the cat where there's no item (heart only).
-- Place and move items while it's away: does it visit them after it's back?
-- Put a cauldron on the tile it dove from: does it come back out on the nearest free front-row tile?
-- Tap "✦ dive" while it's mid-reaction or napping: does it finish first, then dive?
-- Without the button: does a dive come along every minute or two, and does it feel rare enough?
-- Phone: does the bob look smooth, and does dragging stay lag-free while it floats?
-
-**Next**
-- Asa playtests 3b.
-- Then milestone 4 (room themes and the larger catalog), with gifts in milestone 5.
-
 ## Oct 22, 2026 — Cat walks around furniture, climbs if stuck (awaiting playtest)
 
 From the playtest: the cat walked straight (often diagonally) over placed items, and drew on top of things it should pass behind.

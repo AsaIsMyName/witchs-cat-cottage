@@ -146,33 +146,6 @@ export function canStand(room: RoomShape, catalog: Catalog, state: RoomState, ti
   return c.kind === "free" || (c.kind === "top" && c.uid === perch);
 }
 
-/**
- * The free floor tile in one of `rows` nearest to `near`: fewest columns away first, then fewest
- * rows. Undefined if every tile in those rows is taken. Rugs count as free.
- */
-export function nearestFreeTile(
-  room: RoomShape,
-  catalog: Catalog,
-  state: RoomState,
-  near: Tile,
-  rows: number[],
-): Tile | undefined {
-  const cells = floorCells(room, catalog, state);
-  let best: { tile: Tile; cols: number; rowsAway: number } | undefined;
-  for (const row of rows) {
-    if (row < 0 || row >= room.floorRows) continue;
-    for (let col = 0; col < room.columns; col++) {
-      if (cells[row][col].kind !== "free") continue;
-      const cols = Math.abs(col - near.col);
-      const rowsAway = Math.abs(row - near.row);
-      if (!best || cols < best.cols || (cols === best.cols && rowsAway < best.rowsAway)) {
-        best = { tile: { col, row }, cols, rowsAway };
-      }
-    }
-  }
-  return best?.tile;
-}
-
 function floorCells(room: RoomShape, catalog: Catalog, state: RoomState): Cell[][] {
   const cells: Cell[][] = Array.from({ length: room.floorRows }, () =>
     Array.from({ length: room.columns }, (): Cell => ({ kind: "free" })),

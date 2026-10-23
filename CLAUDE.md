@@ -46,13 +46,7 @@ Decided Oct 21, 2026, after the milestone 2 playtest: a scored cat review made d
   - has a top (table, stool): hops up and loafs on it.
   - spooky: ears perk, it stares.
   - anything else: a curious sniff.
-- **Portal moments (milestone 3b):** now and then, the cat dives into a portal and floats around the magic inventory before hopping back out. It's scripted, and the floating cat never covers inventory slots or blocks a drag.
-  - **When:** a dive is due every 60–120s of play time (counted only while the tab is visible). The cat dives the next time it's free to pick an idle activity: queued item visits come first, and a dive never interrupts a reaction, nap, pet, or walk.
-  - **Dive:** it walks to a free tile in the front floor row, says "meow!", and shrinks and fades down into a small floor portal.
-  - **Float:** it comes out of a portal on one spellbook page at 80% size and floats lazily for about 6–8s, drawn behind the book's items. It drifts behind one item on that page and reacts by its tags (shiny: paws at the air; warm: slow blink; spooky: ears perk, it stares; soft: a little curl-up; else a sniff). Book items never move, wobble, or scale. On an empty page it just floats. Dragging from the book works as normal meanwhile; a tap on a book item never pets the cat, and tapping the floating cat elsewhere gets a heart only.
-  - **Return:** it sinks into a page portal and hops back out of a floor portal at the tile it left from (or the nearest free front-row tile), at full size, and carries on. Items placed or moved while it was away are visited after it's back.
-  - **Gifts** come in milestone 5 (see "Earning and unlocks"); the return has a hook for them.
-  - **Dev builds only:** a small "✦ dive" button (top-right) makes the cat dive at its next free moment. It isn't in production builds.
+- **Portal moments (milestone 3 or later):** now and then, the cat tumbles into a portal and floats around the magic inventory for a moment before hopping back out. Sometimes it brings a gift (see "Earning and unlocks"). It's rare and scripted, and the floating cat never covers inventory slots or blocks a drag.
 - **Customizable (milestone 6):** the player names the cat and picks its coat from a set of preset coats, at any time in the game, e.g. to match the room's theme. Presets only in v1; no free color picker. Until a name is chosen, it's "the cat".
 - Its reactions are fixed in v1.
 

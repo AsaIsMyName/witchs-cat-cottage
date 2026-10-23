@@ -27,25 +27,15 @@ function animate(
   });
 }
 
-/**
- * Summon: a glowing ring opens at (x, y), then fades and shrinks out. The cat's dive passes a
- * longer `duration`, its own `radius`, and a `depth` just under the cat.
- */
-export function openPortal(
-  scene: Phaser.Scene,
-  x: number,
-  y: number,
-  opts: { duration?: number; radius?: number; depth?: number } = {},
-): void {
-  const { squash, endScale, colors, lineWidth } = MAGIC_FX.portal;
-  const duration = opts.duration ?? MAGIC_FX.portal.duration;
-  const radius = opts.radius ?? MAGIC_FX.portal.radius;
+/** Summon: a glowing ring opens at (x, y), then fades and shrinks out. */
+export function openPortal(scene: Phaser.Scene, x: number, y: number): void {
+  const { duration, radius, squash, endScale, colors, lineWidth } = MAGIC_FX.portal;
   const rings = colors.map((color, i) => {
     const r = radius * (1 - i * 0.3);
     return scene.add
       .ellipse(x, y, r * 2, r * 2 * squash)
       .setStrokeStyle(lineWidth, color, 1)
-      .setDepth(opts.depth ?? DEPTH_FX);
+      .setDepth(DEPTH_FX);
   });
   const OPEN = 0.3; // fraction of the time spent opening
   animate(
@@ -80,16 +70,15 @@ export function popIn(scene: Phaser.Scene, view: ItemView): void {
   );
 }
 
-/** Land: a few small stars fly out from (x, y) and fade. The floating cat passes its own `count` and `depth`. */
-export function sparkle(scene: Phaser.Scene, x: number, y: number, opts: { count?: number; depth?: number } = {}): void {
-  const { duration, distance, size, colors } = MAGIC_FX.sparkle;
-  const count = opts.count ?? MAGIC_FX.sparkle.count;
+/** Land: a few small stars fly out from (x, y) and fade. */
+export function sparkle(scene: Phaser.Scene, x: number, y: number): void {
+  const { duration, count, distance, size, colors } = MAGIC_FX.sparkle;
   const offset = Math.random() * Math.PI * 2;
   for (let i = 0; i < count; i++) {
     const angle = offset + (i / count) * Math.PI * 2;
     const star = scene.add
       .star(x, y, 4, size * 0.35, size, colors[i % colors.length])
-      .setDepth(opts.depth ?? DEPTH_SPARKLE);
+      .setDepth(DEPTH_SPARKLE);
     scene.tweens.add({
       targets: star,
       x: x + Math.cos(angle) * distance,

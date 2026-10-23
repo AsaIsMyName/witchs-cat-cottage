@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Catalog, RoomShape, RoomState } from "./grid";
-import { canStand, findRoute, nearestFreeTile, planWalk, type Leg, type Tile } from "./route";
+import { canStand, findRoute, planWalk, type Leg, type Tile } from "./route";
 
 const room: RoomShape = { columns: 12, wallRows: 3, floorRows: 3 };
 
@@ -399,29 +399,5 @@ describe("canStand", () => {
     expect(canStand(room, catalog, state, { col: 2, row: 1 })).toBe(false);
     expect(canStand(room, catalog, state, { col: 6, row: 1 })).toBe(false);
     expect(canStand(room, catalog, state, { col: 6, row: 1 }, "p1")).toBe(true);
-  });
-});
-
-describe("nearestFreeTile", () => {
-  const state = roomWith(["table", 5, 2], ["cauldron", 7, 2], ["rug", 0, 2]);
-
-  it("keeps the tile itself when it's free, and counts rugs as free", () => {
-    expect(nearestFreeTile(room, catalog, state, { col: 3, row: 2 }, [2])).toEqual({ col: 3, row: 2 });
-    expect(nearestFreeTile(room, catalog, state, { col: 0, row: 2 }, [2])).toEqual({ col: 0, row: 2 });
-  });
-
-  it("finds the closest free column in the given rows when the tile is taken", () => {
-    expect(nearestFreeTile(room, catalog, state, { col: 7, row: 2 }, [2])).toEqual({ col: 8, row: 2 });
-    expect(nearestFreeTile(room, catalog, state, { col: 5, row: 2 }, [2])).toEqual({ col: 4, row: 2 });
-  });
-
-  it("prefers fewer rows away among equally near columns", () => {
-    expect(nearestFreeTile(room, catalog, state, { col: 6, row: 2 }, [0, 1, 2])).toEqual({ col: 6, row: 1 });
-  });
-
-  it("is undefined when every tile in those rows is taken", () => {
-    const full = roomWith(...Array.from({ length: 6 }, (_, i): [string, number, number] => ["table", i * 2, 2]));
-    expect(nearestFreeTile(room, catalog, full, { col: 3, row: 2 }, [2])).toBeUndefined();
-    expect(nearestFreeTile(room, catalog, full, { col: 3, row: 2 }, [1, 2])).toEqual({ col: 3, row: 1 });
   });
 });

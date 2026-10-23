@@ -121,35 +121,3 @@ export function spotOf(state: RoomState, p: Placement): Spot {
   const host = state.placements.find((h) => h.uid === p.hostUid);
   return host?.layer === "wall" ? "high" : "low";
 }
-
-/** What the cat does when it's free to pick something new. */
-export type NextActivity = "visit" | "dive" | "idle";
-
-/**
- * Queued item visits always come first. Otherwise, once play time reaches `diveDueAt`, the cat
- * dives into a portal; else it picks an idle activity. Only asked when the cat is free, so a dive
- * never interrupts anything.
- */
-export function nextActivity(queued: number, playTime: number, diveDueAt: number): NextActivity {
-  if (queued > 0) return "visit";
-  return playTime >= diveDueAt ? "dive" : "idle";
-}
-
-/** Play time at which the next dive is due: somewhere in `range` (ms) after `playTime`. */
-export function nextDiveAt(playTime: number, [min, max]: readonly [number, number], random: () => number): number {
-  return playTime + min + random() * (max - min);
-}
-
-/** The small things the cat does while floating in the spellbook. None of them touches the item. */
-export type BookReaction = "paw-air" | "blink" | "stare" | "curl" | "sniff";
-
-export interface BookReactionRule {
-  reaction: BookReaction;
-  /** The item has at least one of these tags. */
-  tags: string[];
-}
-
-/** First matching rule wins, like `reactionFor`; anything else gets a sniff. */
-export function bookReactionFor(tags: string[], rules: BookReactionRule[]): BookReaction {
-  return rules.find((r) => r.tags.some((tag) => tags.includes(tag)))?.reaction ?? "sniff";
-}
