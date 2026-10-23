@@ -3,4 +3,3 @@ node_modules/
 package-lock.json
 # Docs and agent notes are hand-written prose; leave their wrapping alone.
 *.md
-.claude/

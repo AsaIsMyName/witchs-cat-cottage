@@ -13,3 +13,5 @@ metadata:
 
 **Why:** each of these caused or nearly caused bugs in milestones 1–4b.
 **How to apply:** check these before touching `DecorateScene.ts`, `cat-actor.ts`, or `room-view.ts`. See [[workflow]].
+
+- **Shapes ignore `roundPixels`.** The placeholder cat is Phaser Rectangles with a 1.5px stroke, and `pixelArt: true` only rounds texture-based objects. Anything that moves a shape-built object to sub-pixel positions shimmers (its size changes frame to frame). Movement in `startMove` rounds to whole pixels for this reason. Keep it, or round any new movement the same way.

@@ -2,6 +2,40 @@
 
 > **New session?** Start with the "Handoff" entry below the 4b entries, then read CLAUDE.md.
 
+## Oct 22, 2026 — Tooling: lint, format, CI gate, pre-commit hook
+
+Handoff step 3, as approved by Asa. Four commits: Prettier config and line endings, a formatting-only commit, ESLint wired into check, CI, and this hook.
+
+**Done**
+- **Line endings:** `.gitattributes` makes every text file LF (`* text=auto eol=lf`), which ends git's LF/CRLF warnings.
+- **Prettier:** 130 columns, otherwise defaults (double quotes, semicolons, trailing commas). Markdown is left out, so CLAUDE.md, STATUS.md, and agent notes keep their wrapping. Scripts: `npm run format`, `npm run format:check`. The whole codebase was reformatted in its own commit (`0987d07`: whitespace, wrapping, and parentheses only).
+- **ESLint:** the recommended rules from ESLint and typescript-eslint, plus eslint-config-prettier. `npm run lint`. The codebase passed with no changes.
+  - TS 7 ships no compiler API, and typescript-eslint needs one. So, as the TS 7 release notes advise, `typescript` is now an npm alias for `@typescript/typescript6` (the API only), and `@typescript/native` is TS 7.0.2, which still provides `tsc`. `npx tsc --version` is 7.0.2.
+- **`npm run check`** = typecheck → lint → format check → tests.
+- **CI** (`.github/workflows/deploy.yml`): every push to `main` or `Feature_InitialBranch` runs `npm ci` and `npm run check`. Only `main` then builds and deploys to Pages, and only if the check passed. Concurrency is per branch, so a feature push never cancels a main deploy.
+- **Pre-commit hook** (`.claude/settings.json` → `.claude/hooks/check-before-commit.mjs`): a PreToolUse hook on Bash and PowerShell.
+  - Any command containing `git commit` (including `git -C dir commit`, or one inside a chain) runs `npm run check` first, and is blocked with the failing output if the check fails.
+  - Every other command passes through silently in about 80ms.
+  - It runs Node by absolute path in exec form (no shell), and npm through that same Node, so it doesn't depend on PATH in Git Bash or PowerShell.
+- Tested live in this session:
+  - a Bash command containing `git commit` with a passing check: allowed
+  - a PowerShell one with a planted type error: blocked, showing the tsc error
+  - all ordinary commands: unaffected
+- Found while testing: Claude Code hands hooks the project path as `c:\…` (lower-case drive). Vitest started from that cwd loaded itself twice, and every test file failed with "Cannot read properties of undefined (reading 'config')". The hook now uses the real path.
+
+**Not verified**
+- CI hasn't run on GitHub yet; nothing was pushed. The first push will show whether `npm ci` resolves the TypeScript aliases on Linux the way it did here.
+- The hook's Node path is `C:/Program Files/nodejs/node.exe`, so it only works on a machine with Node there. On another machine it fails without blocking (a missing program isn't exit 2), so commits there aren't gated.
+- The hook matches the text `git commit` anywhere in a command, so even an `echo` that mentions it runs the check (and is blocked if the check fails). That's harmless, but it's slower.
+
+**Re-test**
+- Nothing to playtest in the browser; the game's code only changed formatting. The 4b round-2 re-test list below still applies.
+- On the next push, check the Actions tab: a green check on the feature branch, and no deploy.
+
+**Next**
+- Asa playtests 4b round 2 and signs off 4b.
+- Handoff step 4: the design-guardian agent and `npm run shots`.
+
 ## Oct 22, 2026 — 4b fixes, round 2: walk shimmer, loaf/nap facing (awaiting playtest)
 
 Asa playtested `47fabde`: corners, arrival facing, idle facing, and petting work, but diagonal walks still flickered mildly, and loafs and naps on an item always faced down.

@@ -8,5 +8,7 @@ export default tseslint.config(
   { ignores: ["dist/", "node_modules/"] },
   js.configs.recommended,
   tseslint.configs.recommended,
+  // Claude Code hooks run in Node, not the browser.
+  { files: [".claude/hooks/**/*.mjs"], languageOptions: { globals: { process: "readonly" } } },
   prettier,
 );
