@@ -1,5 +1,7 @@
 # Status
 
+> **New session?** Start with the "Handoff" entry below the 4b entry, then read CLAUDE.md.
+
 ## Oct 22, 2026 — Milestone 4b: the cat in ¾ (awaiting playtest)
 
 The cat now faces four ways, hides behind tall furniture, and walks at its old pace in tiles. Routing, reactions, petting, the offended blink, perch hop-down, and the visit queue are unchanged.
@@ -56,8 +58,8 @@ Written before a session restart so the next session can pick up cleanly. Read t
   - the 3b portal dive, reverted (dropped)
   - the PC-first and ¾-view redesign of CLAUDE.md
   - **4a, the ¾ room view** (signed off): 960×540, 32px tiles of 16px art, 16 columns, 2 wall rows, 9 floor rows, the book sized to its contents
-  - **4b, the cat in ¾:** 4-direction facing, hiding behind tall furniture, movement tuned for 32px tiles. Its own entry above has the details once it's in.
-- **Milestone 4 = ¾ room view:** 4a done, 4b next (or done), then 4c: the item name on hover and a drop preview.
+  - **4b, the cat in ¾** (`a971456`, built, awaiting Asa's playtest): 4-direction facing, hiding behind tall furniture, movement tuned for 32px tiles. Its own entry above has the details.
+- **Milestone 4 = ¾ room view:** 4a is signed off, and 4b is built and awaiting playtest. 4c (the item name on hover and a drop preview) comes after the tooling steps below.
 - **Merge rule:** see the note under "Workflow". Nothing goes to `main` without Asa's go.
 
 **Next steps, in this order (agreed with Asa)**
