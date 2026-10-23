@@ -1,4 +1,4 @@
-- [Environment](environment.md) — Node not on PATH in PowerShell, dev server on 5173, cat -n line-number trap
+- [Environment](environment.md) — Node not on PATH in PowerShell, dev server on 5174, cat -n line-number trap
 - [Codebase pitfalls](codebase-pitfalls.md) — rebuilt item views, interrupt-guarded tweens, drop math, single sources of truth
 - [Asa's preferences](asa-preferences.md) — ask with a recommendation, always list what wasn't browser-verified
 - [Workflow](workflow.md) — commit on Feature_InitialBranch, never merge or push to main

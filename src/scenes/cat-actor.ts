@@ -81,7 +81,7 @@ export class CatActor {
   /** Bumped on every interrupt; scheduled steps from an older token are dropped. */
   private token = 0;
   private readonly queue: string[] = [];
-  /** Which way it faces; a resting cat faces down (toward the viewer) unless it just turned toward something. */
+  /** Which way it faces: set by each walk leg, an idle action's pick, a reaction, or a glance at a drag. */
   private facing: Facing = "down";
   /**
    * The furniture the cat is up on, and the floor y in front of it. `crossing` means it's only
@@ -374,14 +374,14 @@ export class CatActor {
   /**
    * Faces what it reacts to: up at a wall item or something on a shelf, toward the furniture it
    * stands beside (or the item, on the floor). Up on the item itself (a loaf, a nap on the rug at
-   * `point`), it faces the viewer.
+   * `point`), it keeps the way it walked in, like an idle action.
    */
   private faceItem(uid: string, reaction: Reaction, view: ItemView, point: Point): void {
     const onIt =
       reaction === "loaf"
         ? this.perch?.uid === uid
         : reaction === "nap" && view.def.layer === "rug" && Phaser.Math.Distance.BetweenPoints(this.cat, point) < TILE / 2;
-    if (onIt) return this.setFacing("down");
+    if (onIt) return;
     const placement = this.getState().placements.find((p) => p.uid === uid);
     const anchor = (placement?.layer === "surface" ? this.getViews().get(placement.hostUid) : undefined) ?? view;
     if (anchor.def.layer === "wall") return this.setFacing("up");
@@ -524,7 +524,10 @@ export class CatActor {
     const onUpdate = () => {
       const t = progress.t;
       const lift = 4 * t * (1 - t) * arc;
-      this.cat.setPosition(Phaser.Math.Linear(from.x, to.x, t), Phaser.Math.Linear(from.y, to.y, t) - lift);
+      // Whole pixels: the placeholder is drawn from shapes, which ignore pixelArt's roundPixels, so a
+      // sub-pixel position makes its edges and 1.5px outline land on different pixels every frame, and
+      // it shimmers (on a diagonal, in both width and height at once).
+      this.cat.setPosition(Math.round(Phaser.Math.Linear(from.x, to.x, t)), Math.round(Phaser.Math.Linear(from.y, to.y, t) - lift));
       if (opts.trackDepth) this.updateDepth();
       this.followBubble();
     };

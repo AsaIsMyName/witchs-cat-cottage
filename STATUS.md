@@ -2,6 +2,30 @@
 
 > **New session?** Start with the "Handoff" entry below the 4b entries, then read CLAUDE.md.
 
+## Oct 22, 2026 — 4b fixes, round 2: walk shimmer, loaf/nap facing (awaiting playtest)
+
+Asa playtested `47fabde`: corners, arrival facing, idle facing, and petting work, but diagonal walks still flickered mildly, and loafs and naps on an item always faced down.
+
+**Done**
+- **The diagonal "flicker" wasn't the facing.** Measured headless (Edge against the dev server, with temporary logging, since removed), on four long walks: every facing change happened at the start of a leg, never mid-leg, and the routes were one straight run plus one diagonal run (no zigzag). scaleX and depth were steady too.
+  - **Cause:** the placeholder cat is built from Phaser shapes with a 1.5px outline, and shapes ignore `pixelArt`'s `roundPixels`. Walking puts the cat at sub-pixel positions, so its edges and outline land on different pixels from frame to frame.
+  - **Evidence:** read back the cat's pixels after every frame. Before the fix, on a diagonal its fill went 178 ↔ 209 ↔ 211 px, and its size went 23↔24 wide and 16↔17 tall, changing on about half of all frames. On a straight walk only one axis changed (178–183 px). After the fix, every frame on every walk is identical (178 px, 24×16).
+  - **Fix:** while walking or hopping, the cat moves in whole pixels (`startMove` in `cat-actor.ts`). This steadies straight walks too.
+- **A loaf or nap on the item keeps the way it walked in** (was: always down). So hopping off a moved table now keeps that facing too. Wall items still face up, and beside-the-item reactions still face the item. No pose change was needed: the loaf and nap squash the whole cat from its feet, which works in every facing (idle naps already used it sideways).
+- Stale comment on `facing` fixed. CLAUDE.md's facing bullet now notes the loaf/nap exception.
+
+**Not verified**
+- Not run in a real browser. The shimmer measurement was headless and ran at about 240 fps, not 60. Loaf and nap facing weren't watched at all.
+- Short nudges (bat, sniff, groom bob, stare hop) still tween the cat through sub-pixel positions, so they may shimmer for a moment. They're brief jiggles, so they were left alone.
+
+**Re-test**
+- Long diagonal walks in all four diagonal directions: the outline and size should hold steady. Straight walks should look the same or steadier.
+- Loaf on the table and nap on the rug: the cat faces the way it walked in. Then move the table: it hops down still facing that way.
+- The loaf and nap squash look right sideways and facing up.
+
+**Next**
+- Tooling (approved): formatting commit, ESLint + Prettier config, CI on both branches, pre-commit hook.
+
 ## Oct 22, 2026 — 4b fixes: steady facing on walks, varied facing at rest (awaiting playtest)
 
 The two fixes from the 4b playtest feedback below. First task run by `game-coder` by name; its memory (`.claude/agent-memory/game-coder/`) is seeded with the handoff's lessons and the workflow rule.
