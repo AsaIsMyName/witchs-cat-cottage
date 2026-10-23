@@ -66,6 +66,8 @@ const SHOTS = [
   { file: "10-drag-amber.png", seed: BUSY, setup: (p) => p.drag(p.tray("potion"), p.placed("p3")) },
   // Behind the table's right end, its head past the edge: the table hides the rest of the cat.
   { file: "11-cat-behind-table.png", seed: BUSY, setup: (p) => p.pinCat("right", 5.75, 3) },
+  // The mouse resting on the table, no button pressed: its name shows above it.
+  { file: "12-hover-name.png", seed: BUSY, setup: (p) => p.hover(p.placed("p2")) },
 ];
 
 let vite;
@@ -239,14 +241,15 @@ function makePage(cdp) {
       `new Promise((done) => { let n = ${n}; const step = () => (--n <= 0 ? done() : requestAnimationFrame(step)); requestAnimationFrame(step); })`,
     );
 
-  const mouse = (type, x, y) =>
+  /** A mouse event with the left button held (`held` false: no button, for hovering). */
+  const mouse = (type, x, y, held = true) =>
     cdp.send("Input.dispatchMouseEvent", {
       type,
       x,
       y,
-      button: "left",
-      buttons: type === "mouseReleased" ? 0 : 1,
-      clickCount: 1,
+      button: held ? "left" : "none",
+      buttons: held && type !== "mouseReleased" ? 1 : 0,
+      clickCount: held ? 1 : 0,
     });
 
   const page = {
@@ -272,7 +275,10 @@ function makePage(cdp) {
     placed: (uid) => ({ uid, query: `window.__shots.placed(${JSON.stringify(uid)})` }),
     tray: (itemId) => ({ uid: `tray ${itemId}`, query: `window.__shots.tray(${JSON.stringify(itemId)})` }),
     tile: (layer, col, row) => ({ uid: `${layer} tile ${col},${row}`, query: `window.__shots.tile("${layer}", ${col}, ${row})` }),
-    /** Picks `from` up by its front face and moves it so its footprint lands on `to`'s, without letting go. */
+    /**
+     * Picks `from` up by its front face and moves it so its footprint lands on `to`'s, without letting
+     * go. It stops a few pixels off the spot (still snapping there), so the drop preview shows beside it.
+     */
     async drag(from, to) {
       const a = await evaluate(from.query);
       const b = await evaluate(to.query);
@@ -286,12 +292,19 @@ function makePage(cdp) {
       const start = { x: a.grabX + 5, y: a.grabY };
       await mouse("mouseMoved", start.x, start.y);
       await frames(1);
-      const end = { x: start.x + b.x - a.x, y: start.y + b.y - a.y };
+      const end = { x: start.x + b.x - a.x - 9, y: start.y + b.y - a.y + 7 };
       const steps = 10;
       for (let i = 1; i <= steps; i++) {
         await mouse("mouseMoved", start.x + ((end.x - start.x) * i) / steps, start.y + ((end.y - start.y) * i) / steps);
         await frames(1);
       }
+    },
+    /** Rests the mouse on `target`'s front face without pressing. */
+    async hover(target) {
+      const a = await evaluate(target.query);
+      if (!a) throw new Error(`no ${target.uid} to hover`);
+      await mouse("mouseMoved", a.grabX, a.grabY, false);
+      await frames(2);
     },
     async waitSettled() {
       await waitFor("window.__shots.settled()", "effects to finish");

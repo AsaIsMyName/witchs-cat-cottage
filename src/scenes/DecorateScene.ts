@@ -27,6 +27,7 @@ import {
   ROOM_X,
   SURFACE_ITEM_H,
   TEXT_MUTED,
+  TEXT_OUTLINE,
   TILE,
   TRAY_COUNT_GAP,
   TRAY_HEADING_Y,
@@ -34,11 +35,14 @@ import {
   TRAY_Y,
   WALL_Y,
   drawRoom,
+  depthForBottom,
   gridToWorld,
+  itemGhost,
   layoutPlacements,
   pageItemArea,
   seatOffset,
   surfaceSlotBox,
+  surfaceSlotPosition,
   textStyle,
   visualBox,
   type Box,
@@ -50,6 +54,9 @@ const RESET_PADDING = 6;
 const DEPTH_DRAGGING = 1000;
 /** Over the dragged item and anything riding on it. */
 const DEPTH_HIGHLIGHT_EDGE = DEPTH_DRAGGING + 4;
+const DEPTH_HOVER_NAME = DEPTH_HIGHLIGHT_EDGE + 1;
+/** The drop preview: a see-through copy of the dragged item where it would land. */
+const PREVIEW_ALPHA = 0.45;
 
 const COLOR_OK = 0x7bd389;
 const COLOR_SWAP = 0x6fa8dc;
@@ -66,6 +73,8 @@ interface Drag {
   offsetX: number;
   offsetY: number;
   children: { view: ItemView; dx: number; dy: number }[];
+  /** The drop preview, shown at the snapped spot when the drop would work. */
+  preview: Phaser.GameObjects.Container;
 }
 
 export class DecorateScene extends Phaser.Scene {
@@ -77,6 +86,8 @@ export class DecorateScene extends Phaser.Scene {
   /** The drop highlight's fill, under the dragged item, and its outline, over it (a standing item covers its own footprint). */
   private highlight!: Phaser.GameObjects.Graphics;
   private highlightEdge!: Phaser.GameObjects.Graphics;
+  /** The hovered item's name, mouse only: nothing depends on it, since touch has no hover. */
+  private hoverName!: Phaser.GameObjects.Text;
   private resetButton!: Phaser.GameObjects.Text;
   private resetConfirmTimer?: Phaser.Time.TimerEvent;
   private drag?: Drag;
@@ -100,6 +111,11 @@ export class DecorateScene extends Phaser.Scene {
     drawRoom(this);
     this.highlight = this.add.graphics().setDepth(DEPTH_DRAGGING - 1);
     this.highlightEdge = this.add.graphics().setDepth(DEPTH_HIGHLIGHT_EDGE);
+    this.hoverName = this.add
+      .text(0, 0, "", { ...textStyle(10), stroke: TEXT_OUTLINE, strokeThickness: 3 })
+      .setOrigin(0.5, 1)
+      .setDepth(DEPTH_HOVER_NAME)
+      .setVisible(false);
     this.input.dragDistanceThreshold = 4;
     this.input.on("dragstart", this.onDragStart, this);
     this.input.on("drag", this.onDrag, this);
@@ -175,6 +191,7 @@ export class DecorateScene extends Phaser.Scene {
     this.views.length = 0;
     this.trayLabels = [];
     this.sources.clear();
+    this.hoverName.setVisible(false); // its item's view is gone, so no pointerout will come
 
     this.placedViews = layoutPlacements(this.state, (def, uid) => this.addView(def, { kind: "placed", uid }));
 
@@ -205,6 +222,14 @@ export class DecorateScene extends Phaser.Scene {
     const view = new ItemView(this, def);
     view.body.setInteractive({ useHandCursor: true });
     this.input.setDraggable(view.body);
+    view.body.on("pointerover", () => {
+      if (this.drag) return;
+      this.hoverName
+        .setText(def.name)
+        .setPosition(view.centerX, view.top - 2)
+        .setVisible(true);
+    });
+    view.body.on("pointerout", () => this.hoverName.setVisible(false));
     this.sources.set(view.body, { view, source });
     this.views.push(view);
     return view;
@@ -221,8 +246,10 @@ export class DecorateScene extends Phaser.Scene {
             return child ? [{ view: child, dx: child.x - view.x, dy: child.y - view.y }] : [];
           })
         : [];
-    this.drag = { view, source, offsetX: pointer.worldX - view.x, offsetY: pointer.worldY - view.y, children };
+    const preview = itemGhost(this, view).setAlpha(PREVIEW_ALPHA).setVisible(false);
+    this.drag = { view, source, offsetX: pointer.worldX - view.x, offsetY: pointer.worldY - view.y, children, preview };
     this.dragged = true;
+    this.hoverName.setVisible(false);
     view.setDepth(DEPTH_DRAGGING);
     for (const child of children) child.view.setDepth(DEPTH_DRAGGING + 2);
     if (source.kind === "tray") {
@@ -250,6 +277,7 @@ export class DecorateScene extends Phaser.Scene {
     this.highlight.clear();
     this.highlightEdge.clear();
     if (!drag) return;
+    drag.preview.destroy();
     this.cat.stopWatching();
 
     let next: RoomState | null = null;
@@ -314,6 +342,7 @@ export class DecorateScene extends Phaser.Scene {
   private drawHighlight(drag: Drag, pointer: Phaser.Input.Pointer): void {
     const g = this.highlight.clear();
     const edge = this.highlightEdge.clear();
+    drag.preview.setVisible(false);
     if (pointer.worldY >= TRAY_Y) {
       if (drag.source.kind === "placed") {
         edge.lineStyle(2, COLOR_OK, 0.8).strokeRect(2, TRAY_Y + 2, GAME_WIDTH - 4, GAME_HEIGHT - TRAY_Y - 4);
@@ -335,6 +364,33 @@ export class DecorateScene extends Phaser.Scene {
     // For a swap, also outline where the other item will go.
     const otherBox = plan.kind === "swap" ? this.dropBox(CATALOG[plan.other.itemId], plan.otherTarget) : null;
     if (otherBox) edge.lineStyle(2, COLOR_SWAP, 0.9).strokeRect(otherBox.x, otherBox.y, otherBox.w, otherBox.h);
+
+    if (plan.kind !== "blocked") this.showPreview(drag.preview, def, plan.target);
+  }
+
+  /**
+   * Moves the drop preview to where an item of `def` would stand at `target`, sorted among the
+   * room's items like a placed one, so it shows what it would stand in front of or behind.
+   */
+  private showPreview(preview: Phaser.GameObjects.Container, def: ItemDef, target: Target): void {
+    let at: { x: number; y: number };
+    let depth: number;
+    if (target.kind === "surface") {
+      const host = this.placedViews.get(target.hostUid);
+      if (!host) return;
+      at = surfaceSlotPosition(host, target.slot);
+      depth = host.body.depth + 2; // over the host's own surface items, e.g. one about to be replaced
+    } else {
+      if (def.layer === "surface") return;
+      at = gridToWorld({ layer: def.layer, col: target.col, row: target.row });
+      // Rugs and wall items: over the rugs and the wall, under everything standing on the floor.
+      depth = def.layer === "floor" ? depthForBottom(at.y + def.height * TILE) + 0.5 : DEPTH_FLOOR - 1;
+    }
+    const box = visualBox(def);
+    preview
+      .setPosition(at.x + box.x + box.w / 2, at.y + box.y + box.h / 2)
+      .setDepth(depth)
+      .setVisible(true);
   }
 
   /** Screen area an item of `def` would cover at `target`. */

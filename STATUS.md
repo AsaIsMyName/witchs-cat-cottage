@@ -2,6 +2,40 @@
 
 > **New session?** Read the top entries and the "Handoff" entry, then CLAUDE.md. Older entries are in `STATUS-archive.md`; read it only when you need history.
 
+## Oct 23, 2026 — 4c: item names on hover, drop preview
+
+**Done**
+- **Hover name:** resting the mouse on an item, in the room or in the inventory, shows its name just above its drawn top. It hides when a drag starts. Touch has no hover, so nothing depends on it.
+- **Drop preview:** while dragging, a see-through copy of the item (45% alpha) shows where it would land, at the snapped spot. The item itself still follows the pointer.
+  - The preview shows for green, blue (swap) and amber (replace) drops. It is hidden over red (blocked), over the inventory, and over empty space for surface items.
+  - It sorts among the room's items like a placed item, so it shows whether it lands in front of or behind things. Rug and wall previews sit under everything standing on the floor.
+  - It's built once per drag. Each move only repositions it, so dragging does no extra work per move.
+- All in `src/scenes/DecorateScene.ts`. No logic or save change.
+- **Shots:** new `12-hover-name`. Drag shots now stop a few pixels off the snapped spot so the preview shows beside the item. I looked at 07–12:
+  - `07`: a stool preview at the green spot.
+  - `08`: no preview on red.
+  - `09`: a frame preview in the clock's slot.
+  - `10`: a potion preview over the candle.
+  - `12`: "table" above the table.
+  - The previews are faint in still frames, partly under the held item.
+
+**Not verified**
+- Not run in a real browser: drag feel, hover on a real mouse, and touch (a tap may briefly show the name).
+- The other item in a swap and items riding on furniture have no preview, as planned.
+
+**Re-test**
+- Hover items in the room and the inventory: the name shows and hides cleanly, never during a drag.
+- Drag each kind of item (floor, rug, wall, surface) around: the preview tracks the snapped spot with no lag, sorts in front of or behind furniture correctly, and vanishes over red spots and the inventory.
+
+**Choices to confirm** (Asa, at the playtest)
+- The hover name is built now, though placeholder rectangles still show their names. It matters after the art pass.
+- Preview alpha is 45%.
+- No preview for the other item in a swap. Its blue outline shows where it goes.
+
+**Next**
+- Asa playtests 4c.
+- Codebase sweep by `code-reviewer-opus`.
+
 ## Oct 23, 2026 — Leaner workflow (Asa hit the usage limit)
 
 **Done**
