@@ -2,6 +2,25 @@
 
 > **New session?** Start with the "Handoff" entry below the 4b entries, then read CLAUDE.md.
 
+## Oct 23, 2026 — `npm run shots` (handoff step 4, part B)
+
+**Done**
+- **`npm run shots`** (`scripts/shots.mjs`, plan approved by Asa, guardian verdict "fits"). No new dependencies. It starts its own Vite dev server on a free port, drives headless Edge over CDP (the Edge path is hard-coded for this PC), seeds each scene's save in localStorage, and writes 11 PNGs to the gitignored `shots/` (fixed names, overwritten each run). Viewport 960×540 at 1×. A failure (a timeout, a seed the game rejected, a page error) names the shot and exits 1. Afterwards it stops only the Edge processes using its own scratch profile.
+- Shots: `01-empty-room`, `02-busy-room` (rug under the table with a candle, the cauldron, the stool, a shelf with a potion, frame, clock, moon chart), `03`–`06` the cat facing up/down/left/right, `07`–`10` mid-drag highlights (green free spot, red table over two items, blue frame-onto-clock swap, amber tray potion onto the candle), `11-cat-behind-table`.
+- The seed rooms live in the script.
+- **Dev-only hook** `window.__shots` (`src/scenes/dev-shots.ts`, installed in `DecorateScene.create()` only under `import.meta.env.DEV`). It exposes `pinCat(facing, col, row)`, `placed(uid)`, `tray(itemId)`, `tile(layer, col, row)`, and `settled()` (no tweens running).
+- `CatActor.pin()` stops the cat's own decisions (next action, glances) and stands it on a tile. It ships in the build, unused (Asa's OK).
+- **Leak check:** after `npm run build`, `__shots` and `pinCat` appear nowhere in `dist/`, so the static import is fine. `dist/` was deleted afterwards.
+- All 11 shots were looked at and show what they should. The cat in `11` sticks out past the table's right end, and the table hides the rest.
+- **New rule:** whoever finishes a visual task runs `npm run shots` and looks at the PNGs before Asa playtests. It's in CLAUDE.md's "Project commands" (the command only) and the coder's workflow memory.
+
+**Not verified**
+- Shots are headless Edge, not Asa's browser. They show still frames only: nothing about motion, timing, or drag feel.
+- Works on this PC only (hard-coded Edge path, PowerShell cleanup).
+
+**Next**
+- Plan 4c.
+
 ## Oct 22, 2026 — 4b signed off; design-guardian agent added
 
 **Done**
@@ -18,7 +37,7 @@
 
 **Not verified**
 - The guardian agent now registers by name (the session restarted), but it hasn't been used yet.
-- CI's first run on GitHub was pending when this entry was written. Check the Actions tab.
+- CI's first run passed on both branches: `main` deployed in 40 s; the feature branch ran the check only.
 
 **Next**
 - Handoff step 4, part B: `npm run shots` (approved: headless Edge, its own Vite server, seeded saves, a dev-only hook that pauses the cat and sets its facing, PNGs in a gitignored `shots/`). The guardian checks the coder's plan first.

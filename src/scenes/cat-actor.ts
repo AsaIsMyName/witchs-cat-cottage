@@ -107,6 +107,8 @@ export class CatActor {
   /** Item views the player is holding; wobbles leave them alone. */
   private readonly held = new Set<ItemView>();
   private readonly wobbling = new Set<ItemView>();
+  /** Set by `pin()` for screenshots: blocks only the cat's own decisions (next action, glances); `roomChanged()` can still move it. */
+  private pinned = false;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -177,12 +179,28 @@ export class CatActor {
 
   /** Turns toward (`x`, `y`), but only if the cat is idle and sitting still. */
   glanceAt(x: number, y: number): void {
+    if (this.pinned) return;
     if (this.watching && this.mode === "idle" && this.pose === "resting") this.turnTo({ x, y });
   }
 
   stopWatching(): void {
     this.watching = false;
     this.held.clear();
+  }
+
+  /**
+   * Dev screenshots only (`npm run shots`): stops the cat's routine for good and stands it on floor
+   * tile (`col`, `row`), facing `facing`. A fractional col or row stands it between tiles.
+   */
+  pin(facing: Facing, col: number, row: number): void {
+    this.interrupt();
+    this.pinned = true;
+    this.mode = "idle";
+    this.perch = undefined;
+    const at = floorPoint(col, row);
+    this.cat.setPosition(at.x, at.y);
+    this.setFacing(facing);
+    this.updateDepth();
   }
 
   /** Generous hit area so the small cat is easy to tap on a phone. */
@@ -254,6 +272,7 @@ export class CatActor {
   }
 
   private next(): void {
+    if (this.pinned) return;
     const state = this.getState();
     const views = this.getViews();
     while (this.queue.length > 0) {

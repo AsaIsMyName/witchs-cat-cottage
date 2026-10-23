@@ -1,4 +1,4 @@
 - [Environment](environment.md) — Node PATH, dev server port, headless CDP + 60fps cap recipe, TS7 alias, commit hook quirks
 - [Codebase pitfalls](codebase-pitfalls.md) — rebuilt item views, interrupt-guarded tweens, drop math, shapes ignore roundPixels, per-axis walk timing
 - [Asa's preferences](asa-preferences.md) — ask with a recommendation, always list what wasn't browser-verified
-- [Workflow](workflow.md) — commit on Feature_InitialBranch, never merge or push to main
+- [Workflow](workflow.md) — commit on Feature_InitialBranch, never merge or push to main; npm run shots after visual changes

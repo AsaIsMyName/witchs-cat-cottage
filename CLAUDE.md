@@ -231,5 +231,6 @@ These need Asa's decision; the first one blocks the art pass.
 - `npm test` — Vitest unit tests
 - `npm run check` — typecheck, lint, format check, then tests; must pass before any commit
 - `npm run build` — production build into `dist/`
+- `npm run shots` — headless Edge screenshots of fixed scenes (seeded rooms, the cat's facings, drop highlights) into the gitignored `shots/`
 
 Layout: `src/scenes/` holds Phaser scenes; `src/logic/` holds Phaser-free game logic and its `*.test.ts` files.

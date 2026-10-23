@@ -10,5 +10,14 @@ export default tseslint.config(
   tseslint.configs.recommended,
   // Claude Code hooks run in Node, not the browser.
   { files: [".claude/hooks/**/*.mjs"], languageOptions: { globals: { process: "readonly" } } },
+  // The screenshot script runs in Node 24.
+  {
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: Object.fromEntries(
+        ["process", "console", "Buffer", "fetch", "WebSocket", "setTimeout", "clearTimeout"].map((name) => [name, "readonly"]),
+      ),
+    },
+  },
   prettier,
 );

@@ -14,6 +14,7 @@ import {
 } from "../logic/grid";
 import { layoutTrayRow } from "../logic/tray";
 import { CatActor } from "./cat-actor";
+import { installShotHook } from "./dev-shots";
 import { openPortal, popIn, sendBack, sparkle } from "./magic-fx";
 import { loadRoom, saveRoom } from "./room-store";
 import {
@@ -114,6 +115,14 @@ export class DecorateScene extends Phaser.Scene {
       () => this.state,
       () => this.placedViews,
     );
+    if (import.meta.env.DEV) {
+      installShotHook(
+        this,
+        this.cat,
+        (uid) => this.placedViews.get(uid),
+        (itemId) => [...this.sources.values()].find((e) => e.source.kind === "tray" && e.source.itemId === itemId)?.view,
+      );
+    }
   }
 
   /**
