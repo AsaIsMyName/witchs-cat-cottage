@@ -1,8 +1,10 @@
-name: Deploy to GitHub Pages
+# Every push to main or the feature branch must pass `npm run check`.
+# Only main is built and deployed to GitHub Pages, and only after the check passes.
+name: Check, and deploy main to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, Feature_InitialBranch]
   workflow_dispatch:
 
 permissions:
@@ -11,11 +13,11 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,13 +27,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+      - if: github.ref == 'refs/heads/main'
+        run: npm run build
+      - if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
-    needs: build
+    needs: check
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
