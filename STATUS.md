@@ -10,14 +10,15 @@
 - For a swap, a second see-through copy of the other item shows at its new spot (`drag.otherPreview`, built only when the partner changes, hidden when the plan isn't a swap, destroyed at drag end).
 - `npm run check` passes (194 tests).
 
-**Not verified**
-- Not run in a real browser; `npm run shots` failed in the coder's sandbox ("Edge didn't start"), so 09-drag-blue is unchecked.
+- 09-drag-blue checked from the main session (shots fail only in the coder's sandbox): both copies show. Asa re-tested both kinds of swap: passed.
+- **Pre-merge review** of `2597e89..7d5b0ce` by both reviewers: merge, no blockers. Merged to `main` and pushed on Asa's go.
 
-**Re-test**
-- A same-size swap and a different-size swap (e.g. stool onto table) both show two copies.
-
-**Next**
-- A review by both reviewers and a merge, then milestone 5 (starting with the save top-up).
+**Next: milestone 5, first coder run (batch these)**
+1. **Save top-up** (see the sweep entry below).
+2. **Clear a drag before the room is rebuilt:** if `renderItems()` runs mid-drag (e.g. "reset room" tapped by touch while dragging with the mouse), Phaser drops the drag without `dragend`, so the preview copies stay on screen and `this.drag` dangles (DecorateScene.ts:182). At the top of `renderItems()`, if `this.drag` is set: destroy both previews, clear highlights, `cat.stopWatching()`, `this.drag = undefined`.
+3. **Move `rugUnderfoot()`** (cat-actor.ts:486) into `src/logic/` (e.g. `rugAt(catalog, state, tile)`) with edge-tile tests.
+- Cosmetic, only if Asa asks: preview copies don't show items sitting on the previewed item.
+- Then milestone 5 proper: room themes (~3 wallpapers, ~3 grounds), 25–30 items, book paging. Decide at its start: are wallpapers and grounds all available from the start, or unlocked in the shop?
 
 ## Oct 23, 2026 — Milestone-4 sweep fixes
 
