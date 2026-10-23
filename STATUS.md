@@ -2,6 +2,23 @@
 
 > **New session?** Start with the "Handoff" entry below the 4b entry, then read CLAUDE.md.
 
+## Oct 22, 2026 — 4b playtest feedback (do this first after the restart)
+
+Asa playtested 4b: **working as expected overall.** Before 4b is signed off, there are two fixes. Do them as the **first task of the new session, using `game-coder` by name** (seed its memory first; see the handoff). Then continue with the tooling steps.
+
+1. **Facing flickers on diagonal walks.** On a diagonal the cat mostly stays sideways, which is fine (left/right wins ties), but it flickers between directions.
+   - Choose the facing once per leg, from the leg's overall direction, and keep it for the whole leg. Or add hysteresis, so small wobbles near 45° don't flip it.
+   - It should never change direction mid-leg.
+2. **Actions always face the player, which feels unnatural.** Today a resting cat faces down by default, and sit, groom, nap, and arriving from a walk all end up looking at the player. Asa wants more variety now that there are four directions.
+   - Idle actions (sit, groom, nap) and arrivals should pick a natural facing: e.g. keep the direction it walked in, or pick a random one weighted toward the sides, with up and down sometimes.
+   - Reactions still face the item they're about, and petting still faces wherever the cat is.
+   - Asa hasn't specified exact weights, so propose a simple rule and put the weights in `src/data/cat.ts`.
+   - Update the CLAUDE.md bullet that says a resting cat faces down.
+
+**Still open (ask Asa):** a cauldron in floor row 1 fully hides the cat while it reacts to a wall item above it in row 0. Options:
+- accept it until the art pass (recommended)
+- pick a nearby uncovered spot for wall reactions
+
 ## Oct 22, 2026 — Milestone 4b: the cat in ¾ (awaiting playtest)
 
 The cat now faces four ways, hides behind tall furniture, and walks at its old pace in tiles. Routing, reactions, petting, the offended blink, perch hop-down, and the visit queue are unchanged.
