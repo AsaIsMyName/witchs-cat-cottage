@@ -1,5 +1,22 @@
 # Status
 
+## Oct 22, 2026 — 3b dropped; PC-first and ¾ view decided
+
+**Playtest of 3b (the cat's portal dive): no-go.** It didn't give the vibe Asa wanted. The cat mostly vanished behind a book item with only a text bubble, so it never felt like it was playing with the items. It was reverted (`fe083ce` reverts `e9bb911`). Milestone 3 is closed with 3a only.
+
+**Decided**
+- **PC first:** mouse click-and-drag in a desktop browser. Phones stay playable but untuned, and phone playtests are optional.
+- **¾ view:** a Stardew-style top-down view replaces the front-facing view. It's the new milestone 4, and the later milestones move down by one (themes 5, earning 6, cat customization 7, art 8, feel 9).
+- **Portal dive:** dropped for now. How the cat delivers gifts is now an open question for milestone 6.
+- **Cat pack:** its resolution should be chosen in milestone 4's plan, since it sets the tile size, and it must have 4-direction walking. Candidates, all unverified:
+  - [AbyssalHunter](https://abyssalhunter.itch.io/cat-animations-walk-4-directions-idle-sleep-sit-threaten): the best fit on paper. 4-direction walk, idle, sleep, sit, threaten, 6 colors, about $3.
+  - [Silas Games](https://silasgamedev.itch.io/animated-pixel-cats-5-unique-32x32-sprites-with-4-direction-walk-cycles): 32×32, 4-direction walk, few behaviors.
+  - [Elthen](https://elthen.itch.io/2d-pixel-art-cat-sprites): rich behaviors, but probably side-view only.
+- CLAUDE.md updated throughout.
+
+**Next**
+- Milestone 4 plan (¾ room view) for Asa's approval.
+
 ## Oct 22, 2026 — Cat walks around furniture, climbs if stuck (awaiting playtest)
 
 From the playtest: the cat walked straight (often diagonally) over placed items, and drew on top of things it should pass behind.
