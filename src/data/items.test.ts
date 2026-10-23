@@ -22,6 +22,14 @@ describe("item catalog", () => {
     expect(item.tags.length).toBeLessThanOrEqual(3);
   });
 
+  it.each(ITEMS)("$id only stands up if it is a floor item, by 0–2 tiles", (item) => {
+    if (item.layer !== "floor") expect(item.standHeight).toBeUndefined();
+    else {
+      expect(item.standHeight ?? 0).toBeGreaterThanOrEqual(0);
+      expect(item.standHeight ?? 0).toBeLessThanOrEqual(2);
+    }
+  });
+
   it("starts the tray with known items only", () => {
     for (const id of Object.keys(STARTING_INVENTORY)) expect(CATALOG[id]).toBeDefined();
   });

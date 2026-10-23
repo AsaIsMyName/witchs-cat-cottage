@@ -3,7 +3,7 @@
 
 import * as Phaser from "phaser";
 import { MAGIC_FX } from "../data/magic";
-import { itemGhost, type ItemView } from "./room-view";
+import { TILE, itemGhost, type ItemView } from "./room-view";
 
 /** Above the room and the cat's bubbles, under the drop highlight and the dragged item. */
 const DEPTH_FX = 990;
@@ -31,7 +31,7 @@ function animate(
 export function openPortal(scene: Phaser.Scene, x: number, y: number): void {
   const { duration, radius, squash, endScale, colors, lineWidth } = MAGIC_FX.portal;
   const rings = colors.map((color, i) => {
-    const r = radius * (1 - i * 0.3);
+    const r = radius * TILE * (1 - i * 0.3);
     return scene.add
       .ellipse(x, y, r * 2, r * 2 * squash)
       .setStrokeStyle(lineWidth, color, 1)
@@ -72,7 +72,9 @@ export function popIn(scene: Phaser.Scene, view: ItemView): void {
 
 /** Land: a few small stars fly out from (x, y) and fade. */
 export function sparkle(scene: Phaser.Scene, x: number, y: number): void {
-  const { duration, count, distance, size, colors } = MAGIC_FX.sparkle;
+  const { duration, count, colors } = MAGIC_FX.sparkle;
+  const distance = MAGIC_FX.sparkle.distance * TILE;
+  const size = MAGIC_FX.sparkle.size * TILE;
   const offset = Math.random() * Math.PI * 2;
   for (let i = 0; i < count; i++) {
     const angle = offset + (i / count) * Math.PI * 2;
@@ -98,7 +100,8 @@ export function sparkle(scene: Phaser.Scene, x: number, y: number): void {
  * its own object, so it outlives the re-render that destroys `view`.
  */
 export function sendBack(scene: Phaser.Scene, view: ItemView): void {
-  const { duration, turns, swirlRadius, swirlColor } = MAGIC_FX.sendBack;
+  const { duration, turns, swirlColor } = MAGIC_FX.sendBack;
+  const swirlRadius = MAGIC_FX.sendBack.swirlRadius * TILE;
   const ghost = itemGhost(scene, view).setDepth(DEPTH_FX);
   const swirl = scene.add
     .ellipse(ghost.x, ghost.y, swirlRadius * 2, swirlRadius)

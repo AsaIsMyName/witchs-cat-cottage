@@ -51,6 +51,11 @@ describe("save", () => {
     expect(parseSave(JSON.stringify({ ...save, version: SAVE_VERSION + 1 }), acceptAll)).toBeNull();
   });
 
+  it("is on v3, so v2 saves from the front-facing room start fresh", () => {
+    expect(SAVE_VERSION).toBe(3);
+    expect(parseSave(JSON.stringify({ ...save, version: 2 }), acceptAll)).toBeNull();
+  });
+
   it("rejects rooms that fail the room rules", () => {
     expect(parseSave(JSON.stringify(save), () => false)).toBeNull();
   });

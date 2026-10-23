@@ -18,16 +18,19 @@ import {
 } from "../logic/cat";
 import type { RoomState } from "../logic/grid";
 import { canStand, planWalk, type Leg, type Tile } from "../logic/route";
-import { DEPTH_FLOOR, FLOOR_Y, GAME_WIDTH, ItemView, ROOM_X, TEXT_LIGHT, TILE, textStyle } from "./room-view";
+import { FLOOR_Y, GAME_WIDTH, ItemView, ROOM_X, TEXT_LIGHT, TILE, depthForBottom, textStyle } from "./room-view";
 
-const BODY_W = 30;
-const BODY_H = 14;
-const HEAD = 12;
+// Placeholder sizes, from the tile size so the cat stays in scale with the room.
+const BODY_W = Math.round(TILE * 0.625);
+const BODY_H = Math.round(TILE * 0.3);
+const HEAD = Math.round(TILE * 0.25);
+/** How far above its tile's front edge the cat's feet rest. */
+const FEET_INSET = Math.round(TILE / 8);
 const COLOR_CAT = 0x8a6fbf;
 const COLOR_OUTLINE = 0x1e1a2b;
 const COLOR_HEART = "#f28fb0";
 const DEPTH_BUBBLE = 950;
-const BUBBLE_OFFSET = BODY_H + HEAD + 8;
+const BUBBLE_OFFSET = BODY_H + HEAD + 6;
 
 /** idle: doing its own thing. busy: reacting to an item or being petted. */
 type Mode = "idle" | "busy";
@@ -304,11 +307,11 @@ export class CatActor {
         this.later(250, () => this.wobble(view));
         break;
       case "bat":
-        this.tween({ targets: this.cat, x: this.cat.x + this.facing * 4, duration: 90, yoyo: true, repeat: 3 });
+        this.tween({ targets: this.cat, x: this.cat.x + this.facing * 3, duration: 90, yoyo: true, repeat: 3 });
         this.later(150, () => this.wobble(view));
         break;
       case "stare":
-        this.tween({ targets: this.cat, y: this.cat.y - 6, duration: 120, yoyo: true });
+        this.tween({ targets: this.cat, y: this.cat.y - 4, duration: 120, yoyo: true });
         break;
       case "sniff":
         this.tween({ targets: this.cat, x: this.cat.x + this.facing * 2, duration: 120, yoyo: true, repeat: 3 });
@@ -318,14 +321,14 @@ export class CatActor {
 
   /** Where to stand for a reaction, and whether that means sitting on top of the item. */
   private approach(uid: string, reaction: Reaction, view: ItemView): { point: Point; perch: boolean } {
-    if (reaction === "loaf") return { point: { x: view.centerX, y: view.top + 1 }, perch: true };
+    if (reaction === "loaf") return { point: { x: view.centerX, y: view.seatY }, perch: true };
     if (reaction === "nap" && view.def.layer === "rug") {
-      return { point: { x: view.centerX, y: footprintBottom(view) - 6 }, perch: false };
+      return { point: { x: view.centerX, y: footprintBottom(view) - FEET_INSET - 2 }, perch: false };
     }
     const placement = this.getState().placements.find((p) => p.uid === uid);
     const host = placement?.layer === "surface" ? this.getViews().get(placement.hostUid) : undefined;
     const anchor = host ?? view;
-    if (anchor.def.layer === "wall") return { point: { x: view.centerX, y: FLOOR_Y + TILE - 4 }, perch: false };
+    if (anchor.def.layer === "wall") return { point: { x: view.centerX, y: FLOOR_Y + TILE - FEET_INSET }, perch: false };
     // Stand beside the item (or its furniture): on the side a surface item sits on, else the left,
     // falling back to the other side when there's no room.
     const width = anchor.def.width * TILE;
@@ -336,7 +339,7 @@ export class CatActor {
       side === "right"
         ? right < ROOM_X + BEDROOM.columns * TILE - BODY_W ? right : left
         : left > ROOM_X + BODY_W ? left : right;
-    return { point: { x, y: footprintBottom(anchor) - 4 }, perch: false };
+    return { point: { x, y: footprintBottom(anchor) - FEET_INSET }, perch: false };
   }
 
   /**
@@ -400,7 +403,7 @@ export class CatActor {
    */
   private walkLeg(leg: Leg, exact: Point | undefined, then: () => void): void {
     const host = leg.on !== undefined ? this.getViews().get(leg.on) : undefined;
-    const target = exact ?? (leg.climb && host ? { x: floorPoint(leg.col, leg.row).x, y: host.top + 1 } : floorPoint(leg.col, leg.row));
+    const target = exact ?? (leg.climb && host ? { x: floorPoint(leg.col, leg.row).x, y: host.seatY } : floorPoint(leg.col, leg.row));
     const distance = Phaser.Math.Distance.Between(this.cat.x, this.cat.y, target.x, target.y);
     if (distance < 2) return then();
     this.turnTo(target.x);
@@ -413,7 +416,7 @@ export class CatActor {
     if (leg.climb && host && leg.on !== undefined) {
       // Up on (or across) furniture: drawn above it, and an interrupt drops the cat to the floor in front.
       const hop = this.perch?.uid !== leg.on;
-      const groundY = footprintBottom(host) - 4;
+      const groundY = footprintBottom(host) - FEET_INSET;
       this.perch = { uid: leg.on, groundY, crossing: true };
       this.restY = groundY;
       this.updateDepth();
@@ -582,7 +585,8 @@ export class CatActor {
 
   private updateDepth(): void {
     const host = this.perch && this.getViews().get(this.perch.uid);
-    this.cat.setDepth(host ? host.body.depth + 3 : depthAt(this.cat.y));
+    // Up on furniture it draws over the furniture and what sits on it; on the floor it sorts by its feet.
+    this.cat.setDepth(host ? host.body.depth + 2 : depthForBottom(this.cat.y));
   }
 
   /**
@@ -637,21 +641,22 @@ export class CatActor {
   } {
     const s = this.scene;
     const shape = (x: number, y: number, w: number, h: number) =>
-      s.add.rectangle(x, y, w, h, COLOR_CAT).setOrigin(0.5, 1).setStrokeStyle(2, COLOR_OUTLINE);
+      s.add.rectangle(x, y, w, h, COLOR_CAT).setOrigin(0.5, 1).setStrokeStyle(1.5, COLOR_OUTLINE);
     const headX = BODY_W / 2 - 2;
-    const headBottom = -BODY_H + 4;
-    const tail = shape(-BODY_W / 2 - 1, -BODY_H + 4, 4, 12);
+    const headBottom = -BODY_H + 3;
+    const tail = shape(-BODY_W / 2 - 1, -BODY_H + 3, 3, Math.round(TILE * 0.25));
+    const ear = Math.max(2, Math.round(HEAD / 3));
     const face = [
       shape(headX, headBottom, HEAD, HEAD), // head
-      shape(headX - 3, headBottom - HEAD + 1, 3, 4), // ears
-      shape(headX + 3, headBottom - HEAD + 1, 3, 4),
+      shape(headX - ear, headBottom - HEAD + 1, ear, ear + 1), // ears
+      shape(headX + ear, headBottom - HEAD + 1, ear, ear + 1),
     ];
     return { cat: s.add.container(0, 0, [tail, shape(0, 0, BODY_W, BODY_H), ...face]), tail, face };
   }
 }
 
 function floorPoint(col: number, row: number): Point {
-  return { x: ROOM_X + (col + 0.5) * TILE, y: FLOOR_Y + (row + 1) * TILE - 4 };
+  return { x: ROOM_X + (col + 0.5) * TILE, y: FLOOR_Y + (row + 1) * TILE - FEET_INSET };
 }
 
 function footprintBottom(view: ItemView): number {
@@ -673,11 +678,6 @@ function nearestTileOf(view: ItemView, x: number): Tile {
   const first = Math.round((view.x - ROOM_X) / TILE);
   const col = Phaser.Math.Clamp(tileAt(x, FLOOR_Y).col, first, first + view.def.width - 1);
   return { col, row: rowAt(footprintBottom(view) - 4) };
-}
-
-/** Floor depth for a cat standing at `y`: in front of items in its row, behind rows nearer the front. */
-function depthAt(y: number): number {
-  return DEPTH_FLOOR + rowAt(y) * 10 + 5;
 }
 
 function between([min, max]: number[]): number {

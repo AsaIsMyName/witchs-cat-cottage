@@ -1,28 +1,43 @@
-// Room layout and item drawing shared by the Decorate and CatReview scenes.
+// Room layout and item drawing for the Decorate scene, in the ¾ top-down view (see CLAUDE.md, "Room view").
 
 import * as Phaser from "phaser";
 import { CATALOG, type ItemDef } from "../data/items";
 import { BEDROOM } from "../data/rooms";
 import type { GridLayer, GridPlacement, RoomState } from "../logic/grid";
+import { standShape } from "../logic/stand";
 
-export const GAME_WIDTH = 768;
-export const GAME_HEIGHT = 432;
+export const GAME_WIDTH = 960;
+export const GAME_HEIGHT = 540;
 
-export const TILE = 48;
+/** Screen px per tile: 16px art drawn at 2×. */
+export const TILE = 32;
 export const ROOM_X = (GAME_WIDTH - BEDROOM.columns * TILE) / 2;
-export const WALL_Y = 16;
+/** Top of the wall face (its first row of wall slots). The wall's top edge is drawn just above. */
+export const WALL_Y = 40;
 export const FLOOR_Y = WALL_Y + BEDROOM.wallRows * TILE;
 export const ROOM_BOTTOM = FLOOR_Y + BEDROOM.floorRows * TILE;
 export const TRAY_Y = ROOM_BOTTOM + 12;
-export const SURFACE_ITEM_W = 24;
-export const SURFACE_ITEM_H = 22;
+export const SURFACE_ITEM_W = 16;
+export const SURFACE_ITEM_H = 20;
+/** The lighter cap on a surface item's placeholder. */
+const SURFACE_TOP_H = 5;
+/** A shelf is a ledge along the bottom of its wall slot, with a thin top for surface items. */
+const LEDGE_H = 10;
+const LEDGE_TOP_H = 4;
+/** Placeholders sit this far inside their footprint, so neighbours stay apart. */
+const INSET = 2;
+/** Surface items (and a loafing cat) stand this far back into their host's top face, from its back edge. */
+const SEAT_DEPTH = 0.65;
+/** The wall's top edge, seen from above, drawn over the wall face. */
+const WALL_CAP = 8;
 
 const DEPTH_WALL = 10;
 const DEPTH_RUG = 50;
 export const DEPTH_FLOOR = 100;
 
 const COLOR_WALL = 0x3d3357;
-const COLOR_FLOOR = 0x5a4632;
+const COLOR_WALL_CAP = 0x2a2340;
+const COLOR_FLOOR = 0x6b5539;
 const COLOR_TRAY = 0x221d30;
 const COLOR_GRID_LINE = 0xffffff;
 const COLOR_OUTLINE = 0x1e1a2b;
@@ -30,6 +45,8 @@ const COLOR_BOOK_COVER = 0x2b1f33;
 const COLOR_BOOK_PAGE = 0x342a48;
 const COLOR_BOOK_SPINE = 0x1a1322;
 const COLOR_BOOK_TRIM = 0xc9973f;
+/** A placeholder's front face is its color darkened to this; its top face is the color itself. */
+const FRONT_SHADE = 0.7;
 const SPINE_HALF_W = 5;
 export const TEXT_LIGHT = "#f3e6c4";
 export const TEXT_MUTED = "#a89cc8";
@@ -42,18 +59,48 @@ export interface Box {
   h: number;
 }
 
-/** Where an item's visible rectangle sits inside its footprint. */
-export function visualBox(def: ItemDef): Box {
-  if (def.layer === "surface") return { x: 0, y: 0, w: SURFACE_ITEM_W, h: SURFACE_ITEM_H };
-  const w = def.width * TILE;
-  const h = def.height * TILE;
-  if (def.layer === "wall" && def.visualHeight === undefined) return { x: 3, y: 3, w: w - 6, h: h - 6 };
-  const visibleH = Math.round(h * (def.visualHeight ?? 0.9));
-  return { x: 3, y: h - visibleH, w: w - 6, h: visibleH };
+/** What an item draws, relative to its footprint's top-left: a lighter top face of `topH` over a darker front face. */
+export interface ItemBox extends Box {
+  topH: number;
+}
+
+/**
+ * Where an item's drawn shape sits relative to its footprint's top-left. Floor items rise above
+ * their footprint by their stand height; rugs are their footprint seen from above; wall items fill
+ * their slot (shelves are a ledge); surface items have a fixed size.
+ */
+export function visualBox(def: ItemDef): ItemBox {
+  if (def.layer === "surface") return { x: 0, y: 0, w: SURFACE_ITEM_W, h: SURFACE_ITEM_H, topH: SURFACE_TOP_H };
+  if (def.layer === "wall") {
+    if (def.hasSurface) return { x: 1, y: TILE - LEDGE_H - INSET, w: TILE - 2, h: LEDGE_H, topH: LEDGE_TOP_H };
+    return { x: INSET, y: INSET, w: TILE - INSET * 2, h: TILE - INSET * 2, topH: 0 };
+  }
+  const w = def.width * TILE - INSET * 2;
+  const shape = standShape(def);
+  if (shape.frontFace === 0) {
+    const h = def.height * TILE - INSET * 2;
+    return { x: INSET, y: INSET, w, h, topH: h };
+  }
+  const top = Math.round(shape.top * TILE);
+  return { x: INSET, y: top, w, h: shape.bottom * TILE - top, topH: shape.topFace * TILE };
+}
+
+/** How far below a host's drawn top its surface items (and a loafing cat) stand. */
+export function seatOffset(box: ItemBox): number {
+  return Math.round(box.topH * SEAT_DEPTH);
 }
 
 export function gridToWorld(p: { layer: GridLayer; col: number; row: number }): { x: number; y: number } {
   return { x: ROOM_X + p.col * TILE, y: (p.layer === "wall" ? WALL_Y : FLOOR_Y) + p.row * TILE };
+}
+
+/**
+ * Draw order on the floor: floor items, surface items, and the cat sort by their bottom edge
+ * (screen y of a footprint's front edge, or the cat's feet), so whatever is nearer the front hides
+ * what's behind it. Rugs and wall items always draw underneath.
+ */
+export function depthForBottom(bottom: number): number {
+  return DEPTH_FLOOR + bottom;
 }
 
 /** Text style for small monospace labels. */
@@ -61,33 +108,57 @@ export function textStyle(fontSize: number, color = TEXT_LIGHT): Phaser.Types.Ga
   return { fontFamily: "monospace", fontSize: `${fontSize}px`, color, resolution: 2 };
 }
 
-/** One item on screen: a labeled rectangle, or its sprite once one exists. Positioned by footprint top-left. */
+/** Placeholder colors: the whole shape (the front face, darker when there's a top face over it) and the top face, if any. */
+function faceColors(def: ItemDef, box: ItemBox): { body: number; top?: number } {
+  const hasTop = box.topH > 0 && box.topH < box.h;
+  return hasTop ? { body: shade(def.color, FRONT_SHADE), top: def.color } : { body: def.color };
+}
+
+function shade(color: number, k: number): number {
+  const c = Phaser.Display.Color.IntegerToColor(color);
+  return Phaser.Display.Color.GetColor(Math.round(c.red * k), Math.round(c.green * k), Math.round(c.blue * k));
+}
+
+function placeholderLabel(scene: Phaser.Scene, def: ItemDef, box: ItemBox): Phaser.GameObjects.Text {
+  return scene.add
+    .text(0, 0, def.name, {
+      ...textStyle(9),
+      stroke: TEXT_OUTLINE,
+      strokeThickness: 3,
+      align: "center",
+      wordWrap: { width: Math.max(box.w, TILE) },
+    })
+    .setOrigin(0.5);
+}
+
+/**
+ * One item on screen: a labeled placeholder (top face over front face), or its sprite once one
+ * exists. Positioned by footprint top-left. `body` covers the whole drawn shape, so it's the hit area.
+ */
 export class ItemView {
   readonly body: Phaser.GameObjects.Rectangle;
+  private readonly topFace?: Phaser.GameObjects.Rectangle;
   private readonly sprite?: Phaser.GameObjects.Image;
   private readonly label?: Phaser.GameObjects.Text;
-  readonly box: Box;
+  readonly box: ItemBox;
   x = 0;
   y = 0;
   private scale = 1;
 
   constructor(scene: Phaser.Scene, readonly def: ItemDef) {
     this.box = visualBox(def);
+    const { w, h, topH } = this.box;
     const hasSprite = scene.textures.exists(def.spriteId);
-    this.body = scene.add.rectangle(0, 0, this.box.w, this.box.h, def.color, hasSprite ? 0 : 1).setOrigin(0);
+    const colors = faceColors(def, this.box);
+    this.body = scene.add.rectangle(0, 0, w, h, colors.body, hasSprite ? 0 : 1).setOrigin(0);
     if (hasSprite) {
-      this.sprite = scene.add.image(0, 0, def.spriteId).setOrigin(0).setDisplaySize(this.box.w, this.box.h);
+      this.sprite = scene.add.image(0, 0, def.spriteId).setOrigin(0).setDisplaySize(w, h);
     } else {
       this.body.setStrokeStyle(2, COLOR_OUTLINE);
-      this.label = scene.add
-        .text(0, 0, def.name, {
-          ...textStyle(9),
-          stroke: TEXT_OUTLINE,
-          strokeThickness: 3,
-          align: "center",
-          wordWrap: { width: Math.max(this.box.w, TILE) },
-        })
-        .setOrigin(0.5);
+      if (colors.top !== undefined) {
+        this.topFace = scene.add.rectangle(0, 0, w, topH, colors.top).setOrigin(0).setStrokeStyle(2, COLOR_OUTLINE);
+      }
+      this.label = placeholderLabel(scene, def, this.box);
     }
   }
 
@@ -99,14 +170,16 @@ export class ItemView {
     const left = x + box.x + (box.w * (1 - scale)) / 2;
     const top = y + box.y + (box.h * (1 - scale)) / 2;
     this.body.setPosition(left, top);
+    this.topFace?.setPosition(left, top);
     this.sprite?.setPosition(left, top);
-    this.label?.setPosition(x + box.x + box.w / 2, y + box.y + box.h / 2);
+    this.label?.setPosition(this.centerX, this.centerY);
   }
 
   /** Scales what's drawn around its center, for small pops. Doesn't change x, y, or the footprint. */
   setScale(scale: number): void {
     this.scale = scale;
     this.body.setScale(scale);
+    this.topFace?.setScale(scale);
     this.sprite?.setDisplaySize(this.box.w * scale, this.box.h * scale);
     this.label?.setScale(scale);
     this.setPosition(this.x, this.y);
@@ -119,24 +192,36 @@ export class ItemView {
 
   setDepth(depth: number): void {
     this.body.setDepth(depth);
+    this.topFace?.setDepth(depth + 0.1);
     this.sprite?.setDepth(depth);
     this.label?.setDepth(depth + 0.5);
   }
 
   setAlpha(alpha: number): void {
     this.body.setAlpha(alpha);
+    this.topFace?.setAlpha(alpha);
     this.sprite?.setAlpha(alpha);
     this.label?.setAlpha(alpha);
   }
 
-  /** Horizontal center of the visible item. */
+  /** Horizontal center of the drawn item. */
   get centerX(): number {
     return this.x + this.box.x + this.box.w / 2;
   }
 
-  /** Top edge of the visible item. */
+  /** Vertical center of the drawn item. */
+  get centerY(): number {
+    return this.top + this.box.h / 2;
+  }
+
+  /** Top edge of the drawn item (above the footprint for a floor item that stands up). */
   get top(): number {
     return this.y + this.box.y;
+  }
+
+  /** Where surface items, and a cat loafing up here, stand on this item's top. */
+  get seatY(): number {
+    return this.top + seatOffset(this.box);
   }
 
   /** Width of the item in the tray (its footprint, or its visual size for surface items). */
@@ -144,20 +229,21 @@ export class ItemView {
     return this.def.layer === "surface" ? this.box.w : this.def.width * TILE;
   }
 
-  /** Footprint y that puts the item's visible bottom at `bottom`. */
+  /** Footprint y that puts the item's drawn bottom at `bottom`. */
   footprintYForBottom(bottom: number): number {
     return bottom - (this.box.y + this.box.h);
   }
 
   destroy(): void {
     this.body.destroy();
+    this.topFace?.destroy();
     this.sprite?.destroy();
     this.label?.destroy();
   }
 }
 
 /**
- * A copy of `view`'s look as one container centered on the visible item, so it can spin and
+ * A copy of `view`'s look as one container centered on the drawn item, so it can spin and
  * shrink. Not interactive and not an item view: the scene and the cat never see it.
  */
 export function itemGhost(scene: Phaser.Scene, view: ItemView): Phaser.GameObjects.Container {
@@ -166,31 +252,36 @@ export function itemGhost(scene: Phaser.Scene, view: ItemView): Phaser.GameObjec
   if (scene.textures.exists(def.spriteId)) {
     parts.push(scene.add.image(0, 0, def.spriteId).setDisplaySize(box.w, box.h));
   } else {
-    parts.push(scene.add.rectangle(0, 0, box.w, box.h, def.color).setStrokeStyle(2, COLOR_OUTLINE));
-    parts.push(
-      scene.add
-        .text(0, 0, def.name, {
-          ...textStyle(9),
-          stroke: TEXT_OUTLINE,
-          strokeThickness: 3,
-          align: "center",
-          wordWrap: { width: Math.max(box.w, TILE) },
-        })
-        .setOrigin(0.5),
-    );
+    const colors = faceColors(def, box);
+    parts.push(scene.add.rectangle(0, 0, box.w, box.h, colors.body).setStrokeStyle(2, COLOR_OUTLINE));
+    if (colors.top !== undefined) {
+      const topY = (box.topH - box.h) / 2;
+      parts.push(scene.add.rectangle(0, topY, box.w, box.topH, colors.top).setStrokeStyle(2, COLOR_OUTLINE));
+    }
+    parts.push(placeholderLabel(scene, def, box));
   }
-  return scene.add.container(view.centerX, view.top + box.h / 2, parts);
+  return scene.add.container(view.centerX, view.centerY, parts);
 }
 
+/** The wall band across the top (a wall face with its top edge above), and the floor seen from above. */
 export function drawRoom(scene: Phaser.Scene): void {
   const g = scene.add.graphics();
   const roomW = BEDROOM.columns * TILE;
+  const capY = WALL_Y - WALL_CAP;
+  g.fillStyle(COLOR_WALL_CAP).fillRect(ROOM_X, capY, roomW, WALL_CAP);
   g.fillStyle(COLOR_WALL).fillRect(ROOM_X, WALL_Y, roomW, FLOOR_Y - WALL_Y);
   g.fillStyle(COLOR_FLOOR).fillRect(ROOM_X, FLOOR_Y, roomW, ROOM_BOTTOM - FLOOR_Y);
+  // Faint wall slots, and a slightly clearer tile grid on the floor.
+  g.lineStyle(1, COLOR_GRID_LINE, 0.05);
+  for (let c = 1; c < BEDROOM.columns; c++) g.lineBetween(ROOM_X + c * TILE, WALL_Y, ROOM_X + c * TILE, FLOOR_Y);
+  for (let r = 1; r < BEDROOM.wallRows; r++) g.lineBetween(ROOM_X, WALL_Y + r * TILE, ROOM_X + roomW, WALL_Y + r * TILE);
   g.lineStyle(1, COLOR_GRID_LINE, 0.08);
-  for (let c = 1; c < BEDROOM.columns; c++) g.lineBetween(ROOM_X + c * TILE, WALL_Y, ROOM_X + c * TILE, ROOM_BOTTOM);
-  for (let y = WALL_Y + TILE; y < ROOM_BOTTOM; y += TILE) g.lineBetween(ROOM_X, y, ROOM_X + roomW, y);
-  g.lineStyle(2, COLOR_OUTLINE).strokeRect(ROOM_X, WALL_Y, roomW, ROOM_BOTTOM - WALL_Y);
+  for (let c = 1; c < BEDROOM.columns; c++) g.lineBetween(ROOM_X + c * TILE, FLOOR_Y, ROOM_X + c * TILE, ROOM_BOTTOM);
+  for (let r = 1; r < BEDROOM.floorRows; r++) g.lineBetween(ROOM_X, FLOOR_Y + r * TILE, ROOM_X + roomW, FLOOR_Y + r * TILE);
+  // Where the wall meets the floor, and the wall's top edge.
+  g.lineStyle(2, COLOR_OUTLINE).lineBetween(ROOM_X, FLOOR_Y, ROOM_X + roomW, FLOOR_Y);
+  g.lineStyle(1, COLOR_OUTLINE).lineBetween(ROOM_X, WALL_Y, ROOM_X + roomW, WALL_Y);
+  g.lineStyle(2, COLOR_OUTLINE).strokeRect(ROOM_X, capY, roomW, ROOM_BOTTOM - capY);
   g.fillStyle(COLOR_TRAY).fillRect(0, TRAY_Y, GAME_WIDTH, GAME_HEIGHT - TRAY_Y);
   drawSpellbook(scene, g);
 }
@@ -225,7 +316,7 @@ export const TRAY_HEADING_Y = TRAY_Y + 10;
 export const TRAY_COUNT_GAP = 6;
 /** Room under the items for the count: the gap, one 10px text line, and a little slack. */
 const TRAY_COUNT_SPACE = TRAY_COUNT_GAP + 16;
-/** Visible bottom of every item in the book, leaving room for the counts above the page's padded bottom. */
+/** Drawn bottom of every item in the book, leaving room for the counts above the page's padded bottom. */
 export const TRAY_ITEM_BOTTOM = (() => {
   const area = pageItemArea(BOOK_PAGES[0]);
   return area.y + area.h - TRAY_COUNT_SPACE;
@@ -273,20 +364,26 @@ export function layoutPlacements(
     const view = createView(CATALOG[p.itemId], p.uid);
     const pos = surfaceSlotPosition(host, p.slot);
     view.setPosition(pos.x, pos.y);
-    view.setDepth(host.body.depth + 2);
+    // Just above its host, so it sorts with it: in front of what's behind, behind what's in front.
+    view.setDepth(host.body.depth + 1);
     views.set(p.uid, view);
   }
   return views;
 }
 
-/** Footprint top-left for a surface item in `slot` on the host view. */
+/** Footprint top-left for a surface item in `slot` on the host view: centered in the slot, standing on the host's top. */
 export function surfaceSlotPosition(host: ItemView, slot: number): { x: number; y: number } {
-  return { x: host.x + slot * TILE + (TILE - SURFACE_ITEM_W) / 2, y: host.top - SURFACE_ITEM_H };
+  return { x: host.x + slot * TILE + (TILE - SURFACE_ITEM_W) / 2, y: host.seatY - SURFACE_ITEM_H };
+}
+
+/** Screen area of `slot` on the host view, where a surface item would stand: for the drop highlight. */
+export function surfaceSlotBox(host: ItemView, slot: number): Box {
+  return { x: host.x + slot * TILE, y: host.seatY - SURFACE_ITEM_H - 2, w: TILE, h: SURFACE_ITEM_H + 4 };
 }
 
 function depthOf(p: GridPlacement): number {
-  // Rugs always draw under furniture. Floor items closer to the front (higher row) draw on top.
   if (p.layer === "wall") return DEPTH_WALL;
+  // Rugs never overlap each other, and always draw under everything else on the floor.
   if (p.layer === "rug") return DEPTH_RUG + p.row;
-  return DEPTH_FLOOR + (p.row + CATALOG[p.itemId].height - 1) * 10;
+  return depthForBottom(gridToWorld(p).y + CATALOG[p.itemId].height * TILE);
 }

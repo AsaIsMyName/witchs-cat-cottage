@@ -1,5 +1,43 @@
 # Status
 
+## Oct 22, 2026 — Milestone 4a: ¾ room view (awaiting playtest)
+
+The room is now a Stardew-style ¾ top-down room on a bigger canvas, still with rectangles. Grid rules, swaps, highlights, and the cat's routing logic are unchanged; only the space and the drawing changed.
+
+**Done**
+- Canvas 960×540 (was 768×432), still `Scale.FIT` and `pixelArt: true`. Tiles are 32 screen px: 16px art at 2×.
+- `BEDROOM` is 16 columns, 2 wall rows, 8 floor rows (was 12, 3, 3). `SAVE_VERSION` is 3, so old saves start fresh once.
+- Layout (`room-view.ts`):
+  - Room x 224–736. The wall's top edge is drawn at y 32–40, the wall band (2 rows of wall slots) at y 40–104, the floor (8 rows) at y 104–360.
+  - Book: `TRAY_Y` 372, cover 952×162 at (4, 374). Pages 465×152 at y 379: left x 10, right x 485, spine 475–485. Item areas 443×130 at y 390: left x 21–464, right x 496–939. Items' bottom is at 498 (the tallest, the cauldron, tops out at 434), and the ×N counts sit at 504.
+- Stand height: new catalog field `standHeight` (tiles a floor item stands above its footprint), replacing `visualHeight`. Pure model in new `src/logic/stand.ts` (`standShape`): the top face is the footprint lifted by the stand height, the front face fills the gap down to the footprint's front edge. Table 0.75, stool 0.6, cauldron 1 (drawn two tiles tall); rugs are flat.
+- Drawing: the floor is a lighter area with a faint tile grid, and the wall band has a darker top edge and faint slot lines. Placeholders draw a lighter top face (the item's color) over a darker front face. Wall items fill their slot; a shelf is a 10px ledge at the bottom of its slot with a 4px top. Surface items stand on their host's top face, 65% of the way into it (`seatY`), and a loafing cat sits at the same spot.
+- Draw order: floor items, surface items, and the cat sort by bottom edge via one helper, `depthForBottom` (100 + screen y of a footprint's front edge, or of the cat's feet). Surface items draw at host + 1, a cat up on furniture at host + 2. Rugs stay under everything on the floor (50 + row), wall items at 10. The old row-based `depthAt` in `cat-actor.ts` is gone.
+- Hit areas: an item's `body` rectangle covers its whole drawn shape (top and front face), so it can be grabbed anywhere on it. The top face is a separate, non-interactive rectangle. A fully covered rug still can't be grabbed, by hit testing as before. Drops still target the footprint (the view's x/y stay the footprint's top-left), so a tall item dragged by its top lands where its bottom visibly is.
+- Highlights: the fill draws under the dragged item and the outline over it, since a standing item now covers its own footprint. Surface highlights are drawn where the item would stand in the slot (`surfaceSlotBox`).
+- Cat: body, head, ears, and tail sizes come from `TILE`; feet rest `TILE / 8` above the tile's front edge. Walk 64 px/s (about 2 tiles a second), on top 40 px/s, hop arc 4px. 4-direction facing is not in yet (4b).
+- Effects: portal, sparkle, and swirl sizes in `MAGIC_FX` are now in tiles, scaled by `TILE` in `magic-fx.ts`.
+- Tests: new `stand.test.ts`; a catalog check that only floor items stand up (0–2 tiles); a save test that v2 saves are rejected; the tray test uses today's 32px widths and the new book. 170 unit tests pass. `npm run build` passes (the usual chunk-size warning).
+- CLAUDE.md: concrete numbers in "Room view", the "Grid" bullet describes the ¾ grid, and the prop-size question is resolved to 16×16.
+
+**Not verified**
+- Only two headless screenshots were checked (the empty room, and a seeded room with a table on a rug, a cauldron behind it, a shelf with a candle, wall items, a stool, and a rug). Nothing was dragged, and the cat's movement wasn't watched. Not run in a real browser by Asa.
+- Exact integer scaling of the whole canvas is left for the art pass: with `FIT`, a window that isn't a multiple of 960×540 scales by a fraction, so pixels may be uneven.
+
+**Re-test**
+- Drag each item from the book into the room and back. Does a tall item (cauldron, table) land where its bottom is, even when grabbed by its top?
+- Green, red, blue, and amber highlights: still clear now that the fill is under the item and the outline over it? Swap a table and a stool, and two stools.
+- Candles and potions on the table, the stool, and a shelf: do they look like they stand on the top? Is each slot easy to hit?
+- Put a table over a rug: the rug can't be grabbed. Move the table off: it can.
+- Walk the cat behind the cauldron and the table: is it hidden behind them, and in front of things behind it? Loaf on the table and stool: does it sit on the top face?
+- A cauldron in the back floor row rises over the wall band and hides the wall slot behind it, so a wall item there can't be grabbed until the cauldron moves (like a covered rug). OK?
+- Walk and hop speeds on the bigger floor: comfortable, or too slow across 16 columns?
+- The book: today's inventory fills the left page and only the potion goes to the right one (pages fill left first). Fine until milestone 5's paging?
+
+**Next**
+- 4b: the cat's 4-direction facing and polish.
+- 4c: hover name and drop preview.
+
 ## Oct 22, 2026 — 3b dropped; PC-first and ¾ view decided
 
 **Playtest of 3b (the cat's portal dive): no-go.** It didn't give the vibe Asa wanted. The cat mostly vanished behind a book item with only a text bubble, so it never felt like it was playing with the items. It was reverted (`fe083ce` reverts `e9bb911`). Milestone 3 is closed with 3a only.

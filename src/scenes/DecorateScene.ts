@@ -36,6 +36,8 @@ import {
   gridToWorld,
   layoutPlacements,
   pageItemArea,
+  seatOffset,
+  surfaceSlotBox,
   textStyle,
   visualBox,
   type Box,
@@ -45,6 +47,8 @@ const TRAY_GAP = 12;
 /** "reset room" has this much padding, so its text lines up with the right page's item area. */
 const RESET_PADDING = 6;
 const DEPTH_DRAGGING = 1000;
+/** Over the dragged item and anything riding on it. */
+const DEPTH_HIGHLIGHT_EDGE = DEPTH_DRAGGING + 4;
 
 const COLOR_OK = 0x7bd389;
 const COLOR_SWAP = 0x6fa8dc;
@@ -69,7 +73,9 @@ export class DecorateScene extends Phaser.Scene {
   private placedViews = new Map<string, ItemView>();
   private readonly sources = new Map<Phaser.GameObjects.GameObject, { view: ItemView; source: DragSource }>();
   private trayLabels: Phaser.GameObjects.Text[] = [];
+  /** The drop highlight's fill, under the dragged item, and its outline, over it (a standing item covers its own footprint). */
   private highlight!: Phaser.GameObjects.Graphics;
+  private highlightEdge!: Phaser.GameObjects.Graphics;
   private resetButton!: Phaser.GameObjects.Text;
   private resetConfirmTimer?: Phaser.Time.TimerEvent;
   private drag?: Drag;
@@ -92,6 +98,7 @@ export class DecorateScene extends Phaser.Scene {
     this.state = loadRoom();
     drawRoom(this);
     this.highlight = this.add.graphics().setDepth(DEPTH_DRAGGING - 1);
+    this.highlightEdge = this.add.graphics().setDepth(DEPTH_HIGHLIGHT_EDGE);
     this.input.dragDistanceThreshold = 4;
     this.input.on("dragstart", this.onDragStart, this);
     this.input.on("drag", this.onDrag, this);
@@ -203,7 +210,7 @@ export class DecorateScene extends Phaser.Scene {
     for (const child of children) child.view.setDepth(DEPTH_DRAGGING + 2);
     if (source.kind === "tray") {
       // Purely visual, and the view's x/y are untouched: `onDrag` moves it from this same frame.
-      openPortal(this, view.centerX, view.top + view.box.h / 2);
+      openPortal(this, view.centerX, view.centerY);
       popIn(this, view);
     }
     this.cat.startWatching(pointer.worldX, [view, ...children.map((c) => c.view)]);
@@ -224,6 +231,7 @@ export class DecorateScene extends Phaser.Scene {
     const drag = this.drag;
     this.drag = undefined;
     this.highlight.clear();
+    this.highlightEdge.clear();
     if (!drag) return;
     this.cat.stopWatching();
 
@@ -255,23 +263,25 @@ export class DecorateScene extends Phaser.Scene {
     }
     this.setState(next);
     const landed = landedUid && this.placedViews.get(landedUid);
-    if (landed) sparkle(this, landed.centerX, landed.top + landed.box.h / 2);
+    if (landed) sparkle(this, landed.centerX, landed.centerY);
   }
 
   private targetFor(drag: Drag, pointer: Phaser.Input.Pointer): Target | null {
     const def = drag.view.def;
     if (def.layer === "surface") {
-      // Of the furniture and shelves under the pointer (counting the space just above their tops),
-      // pick the one whose top is closest, so a shelf just above a table still gets its own drops.
+      // Of the furniture and shelves under the pointer (counting the space just above where their
+      // surface items stand), pick the one whose seat is closest, so a shelf just above a tall
+      // table still gets its own drops. Read from the grid, not the views, which may be wobbling.
       let best: { uid: string; slot: number; distance: number } | null = null;
       for (const p of this.state.placements) {
         if (p.layer === "surface" || !CATALOG[p.itemId].hasSurface) continue;
         const host = CATALOG[p.itemId];
+        const box = visualBox(host);
         const { x, y } = gridToWorld(p);
-        const top = y + visualBox(host).y;
+        const seat = y + box.y + seatOffset(box);
         const inX = pointer.worldX >= x && pointer.worldX < x + host.width * TILE;
-        const inY = pointer.worldY >= top - TILE && pointer.worldY < y + host.height * TILE;
-        const distance = Math.abs(pointer.worldY - (top - SURFACE_ITEM_H / 2));
+        const inY = pointer.worldY >= seat - SURFACE_ITEM_H - TILE / 2 && pointer.worldY < y + box.y + box.h;
+        const distance = Math.abs(pointer.worldY - (seat - SURFACE_ITEM_H / 2));
         if (inX && inY && (!best || distance < best.distance)) {
           best = { uid: p.uid, slot: Math.floor((pointer.worldX - x) / TILE), distance };
         }
@@ -288,9 +298,10 @@ export class DecorateScene extends Phaser.Scene {
 
   private drawHighlight(drag: Drag, pointer: Phaser.Input.Pointer): void {
     const g = this.highlight.clear();
+    const edge = this.highlightEdge.clear();
     if (pointer.worldY >= TRAY_Y) {
       if (drag.source.kind === "placed") {
-        g.lineStyle(2, COLOR_OK, 0.8).strokeRect(2, TRAY_Y + 2, GAME_WIDTH - 4, GAME_HEIGHT - TRAY_Y - 4);
+        edge.lineStyle(2, COLOR_OK, 0.8).strokeRect(2, TRAY_Y + 2, GAME_WIDTH - 4, GAME_HEIGHT - TRAY_Y - 4);
       }
       return;
     }
@@ -304,19 +315,18 @@ export class DecorateScene extends Phaser.Scene {
     const box = this.dropBox(def, plan.kind === "blocked" ? target : plan.target);
     if (!box) return;
     g.fillStyle(color, 0.3).fillRect(box.x, box.y, box.w, box.h);
-    g.lineStyle(2, color, 0.9).strokeRect(box.x, box.y, box.w, box.h);
+    edge.lineStyle(2, color, 0.9).strokeRect(box.x, box.y, box.w, box.h);
 
     // For a swap, also outline where the other item will go.
     const otherBox = plan.kind === "swap" ? this.dropBox(CATALOG[plan.other.itemId], plan.otherTarget) : null;
-    if (otherBox) g.lineStyle(2, COLOR_SWAP, 0.9).strokeRect(otherBox.x, otherBox.y, otherBox.w, otherBox.h);
+    if (otherBox) edge.lineStyle(2, COLOR_SWAP, 0.9).strokeRect(otherBox.x, otherBox.y, otherBox.w, otherBox.h);
   }
 
   /** Screen area an item of `def` would cover at `target`. */
   private dropBox(def: ItemDef, target: Target): Box | null {
     if (target.kind === "surface") {
       const host = this.placedViews.get(target.hostUid);
-      if (!host) return null;
-      return { x: host.x + target.slot * TILE, y: host.top - SURFACE_ITEM_H - 2, w: TILE, h: SURFACE_ITEM_H + 2 };
+      return host ? surfaceSlotBox(host, target.slot) : null;
     }
     if (def.layer === "surface") return null;
     const { x, y } = gridToWorld({ layer: def.layer, col: target.col, row: target.row });

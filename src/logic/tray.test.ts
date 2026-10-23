@@ -31,15 +31,16 @@ describe("layoutTrayRow", () => {
   });
 
   it("fits today's starting inventory on the two spellbook pages", () => {
-    // frame, moon chart, shelf, clock, table, stool, rug, cauldron, candle, potion
-    const widths = [48, 48, 48, 48, 96, 48, 96, 48, 24, 24];
+    // frame, moon chart, shelf, clock, table, stool, rug, cauldron, candle, potion, at 32px tiles
+    const widths = [32, 32, 32, 32, 64, 32, 64, 32, 16, 16];
+    // The item areas of the 960px-wide book's pages (see BOOK_PAGES and pageItemArea in room-view.ts).
     const book: Span[] = [
-      { x: 21, w: 347 },
-      { x: 400, w: 347 },
+      { x: 21, w: 443 },
+      { x: 496, w: 443 },
     ];
     const xs = layoutTrayRow(widths, book, 12);
-    expect(within(xs, widths, book[0], [0, 1, 2, 3, 4])).toBe(true);
-    expect(within(xs, widths, book[1], [5, 6, 7, 8, 9])).toBe(true);
+    expect(within(xs, widths, book[0], [0, 1, 2, 3, 4, 5, 6, 7, 8])).toBe(true);
+    expect(within(xs, widths, book[1], [9])).toBe(true);
   });
 
   it("handles an empty inventory", () => {

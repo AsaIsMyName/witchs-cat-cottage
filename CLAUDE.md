@@ -92,19 +92,20 @@ Built in milestone 6 at the earliest, and only if it's still wanted then. It's a
 
 ## Room view: ¾ top-down (milestone 4)
 
-Decided Oct 22, 2026, replacing the front-facing view: the room is seen from above at an angle, like decorating in Stardew Valley. The exact sizes are set in milestone 4's plan.
+Decided Oct 22, 2026, replacing the front-facing view: the room is seen from above at an angle, like decorating in Stardew Valley. Sizes set in milestone 4a (Oct 22, 2026).
 
-- **Deep floor, short wall:** a floor many rows deep, seen from above, with the back wall as a band across the top for wall items.
-- **Drawn height is separate from footprint:** an item can be drawn taller than the tiles it takes (e.g. a 2×1 bookshelf drawn three tiles tall), so it overlaps the rows behind it.
-- **Draw order by bottom edge:** items and the cat are drawn in order of their bottom edge, so the cat can walk behind tall furniture and be partly hidden. Rugs always draw under everything on the floor.
-- **Bigger canvas, smaller tiles:** sized for a desktop browser and a mouse, so the room has much more floor space than the old 12×3.
+- **Deep floor, short wall:** a floor 8 rows deep, seen from above, with the back wall as a 2-row band across the top for wall items. The room is 16 columns wide.
+- **Drawn height is separate from footprint:** an item can be drawn taller than the tiles it takes (e.g. a 2×1 bookshelf drawn three tiles tall), so it overlaps the rows behind it. Each floor item's `standHeight` in `src/data/items.ts` says how many tiles it stands above its footprint: its top face is the footprint lifted by that much, and its front face fills the gap (e.g. table 0.75, stool 0.6, cauldron 1). Rugs are flat, wall items fill their slot (a shelf is a ledge), and surface items have a fixed size.
+- **Draw order by bottom edge:** items and the cat are drawn in order of their bottom edge (a footprint's front edge, the cat's feet), so the cat can walk behind tall furniture and be partly hidden. Rugs always draw under everything on the floor; wall items draw on the wall band, and a tall item in the back row may overlap it.
+- **Bigger canvas, smaller tiles:** a 960×540 game with 32px screen tiles, which are 16px art drawn at 2× (4× on a full-HD screen with the canvas scaled to fit). Not 480×270 with 16px tiles, where placeholder labels and UI text would be unreadable.
+- **Grabbing and dropping:** an item is grabbed anywhere on its drawn shape, but drops are still placed by its footprint, which is where its bottom visibly lands.
 - **The rules carry over:** footprints, layers, rugs, surfaces, swaps, highlights, and the cat's tile routing all keep working on the bigger grid.
 
 ## Decorating
 
 Decorating is the core of the game, so it gets built and playtested first (see Milestones).
 
-- **Grid:** until milestone 4, the room is front-facing: 12 columns wide, with 3 rows of wall slots above 3 rows of floor (back to front), and items in front rows draw on top of items behind them. Milestone 4 replaces this with the ¾ view above.
+- **Grid (¾ view, see "Room view"):** the room is 16 columns wide, with 2 rows of wall slots on the wall band above 8 rows of floor (back to front), and things nearer the front draw over things behind them.
 - **Footprints:** floor items take 1×1, 2×1, or 2×2 tiles. Wall items are always 1×1, since multi-tile wall art is out of v1.
 - **Layers:** rug (floor coverings), floor (chairs, tables, cauldron), wall (frames, shelves, moon charts), and surface (candles, potions, plants placed on top of furniture or shelves).
 - **Rug rules:** rugs share the floor's rows but sit under furniture. A rug can't overlap another rug, but furniture can stand on it. Moving a rug slides it out alone; furniture on it stays put. A rug that's fully covered can't be grabbed until what's on it is moved.
@@ -158,7 +159,7 @@ Art is the biggest risk in a decorating game, so it is decoupled from code and d
 
 1. **Rectangles first.** Build and playtest milestones 1–7 with labeled colored rectangles and flat-color wallpapers and grounds.
 2. **Buy the cat sprite pack** (itch.io, roughly $0–15) before generating any props. Its resolution and palette become the game's style.
-   - Its resolution should be chosen by milestone 4's plan, since it sets the tile size. The purchase itself can wait until the art pass.
+   - It should fit the 16px art scale (16×16 tiles, decided in milestone 4a). The purchase itself can wait until the art pass.
    - It must have **4-direction walking** (up, down, left, right) for the ¾ view.
    - It must be recolorable into the preset coats (e.g. a limited palette that can be swapped), or come with several coat colors.
    - If no pack fits, Claude makes the cat as a pixel grid too, in the same style as the props.
@@ -207,10 +208,10 @@ These rules keep the codebase from drifting as it grows. Claude Code reads this 
 
 ## Open questions
 
-These need Asa's decision; the first two block the art pass.
+These need Asa's decision; the first one blocks the art pass.
 
 - [ ] Which cat sprite pack? It sets the palette and resolution for everything else, needs 4-direction walking, and must be recolorable into preset coats.
-- [ ] Prop size: 16×16 or 32×32 pixels? It sets the tile size, so decide it in milestone 4's plan, ideally together with the cat pack's resolution.
+- [x] Prop size: 16×16 or 32×32 pixels? → **16×16** (decided Oct 22, 2026): tiles are 16 art-pixels, drawn at 2× as 32px screen tiles.
 - [x] Camera view? → **Front-facing room view** (decided Oct 21, 2026), then **replaced by a Stardew-style ¾ top-down view** (decided Oct 22, 2026; milestone 4).
 - [x] Phone or PC? → **PC first**, with phones playable but untuned (decided Oct 22, 2026).
 - [ ] How does the cat deliver gifts, now that the portal dive is dropped? Decide at milestone 6.
