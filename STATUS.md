@@ -2,7 +2,21 @@
 
 > **New session?** Start with the "Handoff" entry below the 4b entries, then read CLAUDE.md.
 
-## Oct 22, 2026 — 4b fixes, round 3: even steps on diagonal walks (awaiting playtest)
+## Oct 22, 2026 — 4b signed off; design-guardian agent added
+
+**Done**
+- **Milestone 4b is signed off.** Asa re-tested round 3: diagonal walks are fixed. Asa chose to review and merge 4b now, ahead of 4c (handoff steps 4 and 6 swapped for this batch).
+- **Design-guardian agent** (`.claude/agents/design-guardian.md`, handoff step 4, part A, approved by Asa): a read-only Opus agent (Read, Grep, Glob only). It checks a plan before the coder starts, or a diff afterwards, against CLAUDE.md's intent and for engineering restraint. It reports a verdict (fits, concerns, or conflicts), at most 5 points citing CLAUDE.md, and questions for Asa.
+
+**Not verified**
+- The agent registers only after a session restart. Until then it is run as a general agent told to follow its file.
+
+**Next**
+- Both reviewers on `e71641d..` this commit, then merge to `main` on Asa's go. The merge is the first push of the CI workflow.
+- Handoff step 4, part B: `npm run shots` (approved: headless Edge, its own Vite server, seeded saves, a dev-only hook that pauses the cat and sets its facing, PNGs in a gitignored `shots/`). The guardian checks the coder's plan first.
+- Then 4c.
+
+## Oct 22, 2026 — 4b fixes, round 3: even steps on diagonal walks (signed off)
 
 Asa playtested round 2 on a 60 Hz monitor: straight walks look good, diagonals still flickered a little. Loaf/nap facing and the squash are signed off.
 
