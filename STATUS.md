@@ -11,7 +11,11 @@
 - `npm run check` passes (184 tests).
 
 **Not verified**
-- Not run in a real browser. `npm run shots` failed here ("Edge didn't start"), so 01 and 02 were not looked at.
+- Not run in a real browser. `npm run shots` failed inside the coder's sandbox ("Edge didn't start"); it ran fine from the main session, and 01 and 02 look right.
+
+**Also (Asa's go on the sweep's other two findings)**
+- **Tall items:** a new data test keeps every item at most 3 tiles drawn (`height + standHeight`). The book's height, and so the room's layout, follows the tallest item; a taller one pushes the top wall row off-screen. Raise it only with a layout change.
+- **Saves and new items (do at the start of milestone 5):** a loaded save keeps its inventory as saved, so items added later never reach it, and a renamed item id resets the room. Fix: on load, add each `STARTING_INVENTORY` id that is in neither the save's inventory keys nor its placements (zero counts stay as keys, so absent means never owned). A logic function with a test.
 
 **Re-test**
 - Pull a rug from under a cat that's napping on it on its own (not after you placed the rug): it should give the offended blink.
@@ -19,6 +23,7 @@
 
 **Next**
 - Milestone 4 go/no-go playtest.
+- Milestone 5 starts with the save top-up above.
 
 ## Oct 23, 2026 — 4c: item names on hover, drop preview
 

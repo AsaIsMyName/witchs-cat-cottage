@@ -30,6 +30,12 @@ describe("item catalog", () => {
     }
   });
 
+  // The book's page height, and so the whole room's layout, follows the tallest item: past about
+  // 3 tiles drawn, the top wall row is pushed off-screen. Raise this only with a layout change.
+  it.each(ITEMS)("$id is drawn at most 3 tiles tall", (item) => {
+    expect(item.height + (item.standHeight ?? 0)).toBeLessThanOrEqual(3);
+  });
+
   it("starts the tray with known items only", () => {
     for (const id of Object.keys(STARTING_INVENTORY)) expect(CATALOG[id]).toBeDefined();
   });
