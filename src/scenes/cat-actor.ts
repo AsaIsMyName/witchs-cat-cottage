@@ -2,7 +2,7 @@
 // Decisions come from src/logic/cat.ts; this file only animates them.
 
 import * as Phaser from "phaser";
-import { CAT_BEHAVIOR, CAT_TIMING, IDLE_LINES, OFFENDED_LINE, PET_LINE, REACTION_LINES } from "../data/cat";
+import { CAT_BEHAVIOR, CAT_FACING, CAT_TIMING, IDLE_LINES, OFFENDED_LINE, PET_LINE, REACTION_LINES } from "../data/cat";
 import { CATALOG } from "../data/items";
 import { BEDROOM } from "../data/rooms";
 import {
@@ -11,6 +11,8 @@ import {
   facingFor,
   facingSign,
   facingStep,
+  idleFacing,
+  legFacing,
   movedOrRemoved,
   pickIdle,
   reactionFor,
@@ -301,6 +303,7 @@ export class CatActor {
 
   private wander(col: number, row: number, action: IdleAction): void {
     this.walkTo(floorPoint(col, row), () => {
+      this.setFacing(idleFacing(this.facing, CAT_FACING, Math.random));
       this.acting = true;
       this.restY = this.cat.y;
       this.say(IDLE_LINES[action]);
@@ -409,8 +412,9 @@ export class CatActor {
   /**
    * Plans a route from where the cat is and walks its legs in turn, re-planning if the room changed
    * meanwhile. A change during the last leg only re-plans if it left the cat on a blocked tile.
+   * `replanned` means the cat is already partway through this walk, so its facing carries on.
    */
-  private walkRoute(point: Point, goal: Tile, endOnTop: boolean, then: () => void): void {
+  private walkRoute(point: Point, goal: Tile, endOnTop: boolean, then: () => void, replanned = false): void {
     const state = this.getState();
     const from = this.tileHere();
     const { climbCost, frontBackHopCost } = CAT_TIMING;
@@ -426,12 +430,13 @@ export class CatActor {
       const now = this.getState();
       if (i >= legs.length) {
         if (now !== state && !canStand(BEDROOM, CATALOG, now, this.tileHere(), this.perch?.uid)) {
-          return this.walkRoute(point, goal, endOnTop, then);
+          return this.walkRoute(point, goal, endOnTop, then, true);
         }
         return this.arrive(then);
       }
-      if (now !== state) return this.walkRoute(point, goal, endOnTop, then);
-      this.walkLeg(legs[i], i === legs.length - 1 && exact ? point : undefined, () => step(i + 1));
+      if (now !== state) return this.walkRoute(point, goal, endOnTop, then, true);
+      const exactEnd = i === legs.length - 1 && exact ? point : undefined;
+      this.walkLeg(legs[i], i === 0 ? from : legs[i - 1], replanned || i > 0, exactEnd, () => step(i + 1));
     };
     step(0);
   }
@@ -442,15 +447,21 @@ export class CatActor {
   }
 
   /**
-   * One straight leg of a route, ending at `exact` if given (the walk's final point), else at the
-   * leg's tile. Hops on and off furniture are short arcs; on top it walks a little slower.
+   * One straight leg of a route from tile `from`, ending at `exact` if given (the walk's final
+   * point), else at the leg's tile. Hops on and off furniture are short arcs; on top it walks a
+   * little slower. Its facing is picked once, from the leg's tile direction (exactly straight or
+   * diagonal), and holds for the whole leg; `continuing` legs keep the walk's facing when they can.
    */
-  private walkLeg(leg: Leg, exact: Point | undefined, then: () => void): void {
+  private walkLeg(leg: Leg, from: Tile, continuing: boolean, exact: Point | undefined, then: () => void): void {
     const host = leg.on !== undefined ? this.getViews().get(leg.on) : undefined;
     const target = exact ?? (leg.climb && host ? { x: floorPoint(leg.col, leg.row).x, y: host.seatY } : floorPoint(leg.col, leg.row));
     const distance = Phaser.Math.Distance.Between(this.cat.x, this.cat.y, target.x, target.y);
     if (distance < 2) return then();
-    this.turnTo(target);
+    const tiles = { x: leg.col - from.col, y: leg.row - from.row };
+    // Within one tile (a step to the exact end point, or across a perch), the pixel direction.
+    const way = tiles.x !== 0 || tiles.y !== 0 ? tiles : { x: target.x - this.cat.x, y: target.y - this.cat.y };
+    const deadZone = way === tiles ? 0 : TURN_DEAD_ZONE;
+    this.setFacing(legFacing(way.x, way.y, this.facing, continuing, CAT_FACING, deadZone));
     /** `speed` in tiles per second; none means a hop. */
     const move = (speed: number | undefined, trackDepth: boolean) => {
       if (speed === undefined) return this.startMove(target, CAT_TIMING.hop, then, { arc: HOP_ARC });
@@ -479,8 +490,7 @@ export class CatActor {
   /** End of a walk. If the route ended up on furniture, the cat stays there like a perch until its next walk. */
   private arrive(then: () => void): void {
     this.restY = undefined;
-    this.pose = "resting";
-    this.setFacing("down"); // a visit then turns it toward the item
+    this.pose = "resting"; // still facing the way it walked; a visit then turns it toward the item
 
     if (this.perch) this.perch = { uid: this.perch.uid, groundY: this.perch.groundY };
     this.updateDepth();
@@ -492,8 +502,7 @@ export class CatActor {
     this.perch = undefined;
     const landed = () => {
       this.restY = undefined;
-      this.pose = "resting";
-      this.setFacing("down");
+      this.pose = "resting"; // unbothered: still facing the way it was
       this.updateDepth();
       then();
     };

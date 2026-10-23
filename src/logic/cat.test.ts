@@ -5,12 +5,15 @@ import {
   facingFor,
   facingSign,
   facingStep,
+  idleFacing,
+  legFacing,
   movedOrRemoved,
   pickIdle,
   slotSide,
   toBack,
   reactionFor,
   type CatBehavior,
+  type FacingRules,
   type TaggedCatalog,
 } from "./cat";
 import { emptyRoom, moveItem, placeFromTray, removeToTray, type RoomShape, type RoomState, type Target } from "./grid";
@@ -149,6 +152,64 @@ describe("facingFor", () => {
     expect(facingFor(3, -2, "down", 4)).toBe("down");
     expect(facingFor(5, -2, "down", 4)).toBe("right");
     expect(facingFor(1, -6, "down", 4)).toBe("up");
+  });
+});
+
+const facingRules: FacingRules = {
+  keepWhileWalking: 0.5,
+  idleKeepChance: 0.6,
+  idleWeights: { left: 4, right: 4, up: 1, down: 1 },
+};
+
+describe("legFacing", () => {
+  it("turns a first leg along its dominant axis, sideways on an exact diagonal", () => {
+    expect(legFacing(0, 2, "up", false, facingRules)).toBe("down");
+    expect(legFacing(3, 3, "down", false, facingRules)).toBe("right");
+    expect(legFacing(-1, -1, "up", false, facingRules)).toBe("left");
+  });
+
+  it("keeps the walk's facing on a later diagonal leg that still heads that way", () => {
+    // A near-vertical walk: two tiles down, then a diagonal down and right. No flip to the side.
+    expect(legFacing(3, 3, "down", true, facingRules)).toBe("down");
+    expect(legFacing(-2, -2, "up", true, facingRules)).toBe("up");
+    // A near-horizontal walk: right, then diagonally right and up. Stays sideways.
+    expect(legFacing(1, -1, "right", true, facingRules)).toBe("right");
+  });
+
+  it("still turns when a later leg leaves the way it faces", () => {
+    expect(legFacing(0, 2, "right", true, facingRules)).toBe("down"); // around a corner
+    expect(legFacing(-2, 2, "right", true, facingRules)).toBe("left"); // a diagonal back the other way
+    expect(legFacing(-3, 0, "right", true, facingRules)).toBe("left");
+  });
+
+  it("absorbs small wobbles on a later leg, but not big ones", () => {
+    expect(legFacing(10, 4, "right", true, facingRules, 4)).toBe("right");
+    expect(legFacing(10, 18, "right", true, facingRules, 4)).toBe("right"); // 10 >= 18 × 0.5
+    expect(legFacing(6, 20, "right", true, facingRules, 4)).toBe("down");
+    expect(legFacing(3, 2, "left", true, facingRules, 4)).toBe("left"); // inside the dead zone
+  });
+});
+
+describe("idleFacing", () => {
+  it("usually keeps the facing it arrived with", () => {
+    expect(idleFacing("up", facingRules, scripted(0.59))).toBe("up");
+  });
+
+  it("otherwise picks by weight, mostly sideways", () => {
+    // Weights 4, 4, 1, 1 out of 10 (left, right, up, down), so r × 10 lands in [0,4) [4,8) [8,9) [9,10).
+    expect(idleFacing("up", facingRules, scripted(0.6, 0))).toBe("left");
+    expect(idleFacing("up", facingRules, scripted(0.6, 0.79))).toBe("right");
+    expect(idleFacing("left", facingRules, scripted(0.6, 0.85))).toBe("up");
+    expect(idleFacing("left", facingRules, scripted(0.6, 0.99))).toBe("down");
+  });
+
+  it("never picks a facing with no weight, and keeps the facing when no weights are set", () => {
+    const sidesOnly = { ...facingRules, idleWeights: { left: 1, right: 1, up: 0, down: 0 } };
+    for (const r of [0, 0.3, 0.5, 0.7, 0.99]) {
+      expect(["left", "right"]).toContain(idleFacing("up", sidesOnly, scripted(0.9, r)));
+    }
+    const none = { ...facingRules, idleWeights: { left: 0, right: 0, up: 0, down: 0 } };
+    expect(idleFacing("up", none, scripted(0.9, 0.5))).toBe("up");
   });
 });
 

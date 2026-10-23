@@ -1,6 +1,6 @@
 // The ambient cat's reactions, idle habits, and pacing. Fixed in v1 (see CLAUDE.md).
 
-import type { CatBehavior, IdleAction, Reaction } from "../logic/cat";
+import type { CatBehavior, FacingRules, IdleAction, Reaction } from "../logic/cat";
 
 /** Shown in text. Unnamed for now. */
 export const CAT_NAME = "the cat";
@@ -16,6 +16,17 @@ export const CAT_BEHAVIOR: CatBehavior = {
   ],
   cozyReactions: ["nap", "warm", "loaf"],
   cozyChance: 0.5,
+};
+
+/**
+ * Which way it faces. Each walk leg picks its facing once; later legs of the walk keep it while
+ * they still head that way (diagonals included), so it never flickers mid-walk. It arrives facing
+ * the way it walked; an idle action then mostly keeps that, or turns a random way, mostly sideways.
+ */
+export const CAT_FACING: FacingRules = {
+  keepWhileWalking: 0.5,
+  idleKeepChance: 0.6,
+  idleWeights: { left: 4, right: 4, up: 1, down: 1 },
 };
 
 /** What the cat "says" for each reaction. */

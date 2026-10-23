@@ -1,21 +1,54 @@
 # Status
 
-> **New session?** Start with the "Handoff" entry below the 4b entry, then read CLAUDE.md.
+> **New session?** Start with the "Handoff" entry below the 4b entries, then read CLAUDE.md.
 
-## Oct 22, 2026 — 4b playtest feedback (do this first after the restart)
+## Oct 22, 2026 — 4b fixes: steady facing on walks, varied facing at rest (awaiting playtest)
+
+The two fixes from the 4b playtest feedback below. First task run by `game-coder` by name; its memory (`.claude/agent-memory/game-coder/`) is seeded with the handoff's lessons and the workflow rule.
+
+**Done**
+- **No flicker on diagonal walks.** Each leg picks its facing once, before it moves, and keeps it for the whole leg (`legFacing` in `src/logic/cat.ts`).
+  - The direction comes from the leg's tiles (exactly straight or exactly diagonal), not the cat's pixel position, so being a few px off a tile's center can no longer tip a diagonal to up/down. Only a step inside one tile (to the exact end point, or across a perch) uses pixels, with the old dead zone.
+  - The first leg of a walk turns along its dominant axis, left/right on a tie, so a diagonal walk is sideways.
+  - Later legs of the same walk (and legs after a re-plan) keep the current facing while they still head that way by at least half as much as they move across it (`keepWhileWalking` 0.5). Routes are a straight run plus a diagonal run, so e.g. "down 2, then diagonally down-right 3" now faces down the whole way instead of down then right. A real corner (down, then right) still turns.
+- **Varied facing at rest.**
+  - Arriving from a walk keeps the walk's facing (was: always down). Hopping down from a moved perch keeps its facing too.
+  - When an idle action (sit, groom, nap) starts: 60% keeps the arrival facing, otherwise a random one weighted left 4, right 4, up 1, down 1 (`idleFacing`, RNG injected).
+  - Reactions still face their item (a loaf or rug nap on the item still faces down). Petting and the drag glance are unchanged.
+- All weights in `CAT_FACING` in `src/data/cat.ts`.
+- CLAUDE.md "The cat" → Behavior: the facing bullet no longer says a resting cat faces down.
+- 184 unit tests pass (7 new: first-leg ties, keeping the facing on later diagonals, real corners, wobbles and the dead zone, idle keep chance, weighted picks, zero weights).
+- **Decided (Asa): the cauldron case is accepted until the art pass.** A cauldron (or other tall item) in floor row 1 fully hides the cat while it reacts to a wall item above it in row 0. No code change; revisit with real sprites.
+
+**Not verified**
+- Not run in a browser at all, headless or real. Only typecheck and unit tests. The scene wiring (`walkLeg`'s tile direction, `arrive`, `hopDown`, `wander`) is untested by Vitest.
+
+**Re-test**
+- Long diagonal and near-diagonal walks across the room: one facing per stretch, no flicker. A pure diagonal faces sideways; a mostly-vertical walk with a diagonal end stays up or down.
+- Walks around furniture still turn at real corners.
+- Sit, groom, nap after a wander: mostly the way it walked in, sometimes a new way, mostly sideways, now and then up (back to you) or down.
+- Reactions still face their item: up at a wall clock, toward the table or cauldron from beside it, down on a loaf or rug nap.
+- Petting when it faces up or sideways: the roll and heart still look right, and it doesn't turn.
+- Move a table it's loafing on: it hops down without turning to face you.
+
+**Next**
+- Asa playtests the fixes and signs off 4b.
+- Tooling task (to propose first, not built yet): ESLint + Prettier in `npm run check`, a GitHub Actions gate before the Pages deploy, and a Claude Code pre-commit hook.
+
+## Oct 22, 2026 — 4b playtest feedback (done; see the entry above)
 
 Asa playtested 4b: **working as expected overall.** Before 4b is signed off, there are two fixes. Do them as the **first task of the new session, using `game-coder` by name** (seed its memory first; see the handoff). Then continue with the tooling steps.
 
-1. **Facing flickers on diagonal walks.** On a diagonal the cat mostly stays sideways, which is fine (left/right wins ties), but it flickers between directions.
+1. **Done:** **Facing flickers on diagonal walks.** On a diagonal the cat mostly stays sideways, which is fine (left/right wins ties), but it flickers between directions.
    - Choose the facing once per leg, from the leg's overall direction, and keep it for the whole leg. Or add hysteresis, so small wobbles near 45° don't flip it.
    - It should never change direction mid-leg.
-2. **Actions always face the player, which feels unnatural.** Today a resting cat faces down by default, and sit, groom, nap, and arriving from a walk all end up looking at the player. Asa wants more variety now that there are four directions.
+2. **Done:** **Actions always face the player, which feels unnatural.** Today a resting cat faces down by default, and sit, groom, nap, and arriving from a walk all end up looking at the player. Asa wants more variety now that there are four directions.
    - Idle actions (sit, groom, nap) and arrivals should pick a natural facing: e.g. keep the direction it walked in, or pick a random one weighted toward the sides, with up and down sometimes.
    - Reactions still face the item they're about, and petting still faces wherever the cat is.
    - Asa hasn't specified exact weights, so propose a simple rule and put the weights in `src/data/cat.ts`.
    - Update the CLAUDE.md bullet that says a resting cat faces down.
 
-**Still open (ask Asa):** a cauldron in floor row 1 fully hides the cat while it reacts to a wall item above it in row 0. Options:
+**Decided: accept it until the art pass** (Asa, Oct 22, 2026). Was: a cauldron in floor row 1 fully hides the cat while it reacts to a wall item above it in row 0. Options:
 - accept it until the art pass (recommended)
 - pick a nearby uncovered spot for wall reactions
 

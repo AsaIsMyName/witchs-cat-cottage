@@ -56,6 +56,59 @@ export function facingFor(dx: number, dy: number, current: Facing, deadZone = 0)
   return dy < 0 ? "up" : "down";
 }
 
+/** Tuning for which way the cat faces when it walks and rests (values in src/data/cat.ts). */
+export interface FacingRules {
+  /**
+   * Later legs of a walk keep the current facing while they still move along it by at least this
+   * fraction of their move across it (1 keeps it on an exact diagonal), so it doesn't flip mid-walk.
+   */
+  keepWhileWalking: number;
+  /** Chance (0–1) that an idle action (sit, groom, nap) keeps the facing it arrived with. */
+  idleKeepChance: number;
+  /** Otherwise, relative weights for a fresh random facing. */
+  idleWeights: Record<Facing, number>;
+}
+
+/**
+ * The facing for one leg of a walk that moves (dx, dy), chosen once for the whole leg. The first
+ * leg turns along its dominant axis (left/right on a tie, so a diagonal walk is sideways). A later
+ * leg (`continuing`) keeps the current facing when it still heads that way enough, e.g. a straight
+ * leg into a diagonal one, so a near-diagonal walk never flickers between two facings.
+ */
+export function legFacing(
+  dx: number,
+  dy: number,
+  current: Facing,
+  continuing: boolean,
+  rules: Pick<FacingRules, "keepWhileWalking">,
+  deadZone = 0,
+): Facing {
+  if (continuing) {
+    const step = facingStep(current);
+    const along = dx * step.x + dy * step.y;
+    const across = Math.abs(dx * step.y - dy * step.x);
+    if (along > deadZone && along >= across * rules.keepWhileWalking) return current;
+  }
+  return facingFor(dx, dy, current, deadZone);
+}
+
+/**
+ * The facing as an idle action starts: usually the way it arrived, otherwise a random one by
+ * weight (mostly sideways). `random` returns numbers in [0, 1), like Math.random.
+ */
+export function idleFacing(current: Facing, rules: Omit<FacingRules, "keepWhileWalking">, random: () => number): Facing {
+  if (random() < rules.idleKeepChance) return current;
+  const options = (Object.entries(rules.idleWeights) as [Facing, number][]).filter(([, w]) => w > 0);
+  const total = options.reduce((sum, [, w]) => sum + w, 0);
+  if (total <= 0) return current;
+  let r = random() * total;
+  for (const [facing, w] of options) {
+    r -= w;
+    if (r < 0) return facing;
+  }
+  return options[options.length - 1][0];
+}
+
 /** A unit step in the facing direction, in screen axes (y grows down), e.g. for a nudge toward what it faces. */
 export function facingStep(facing: Facing): { x: number; y: number } {
   if (facing === "left") return { x: -1, y: 0 };
