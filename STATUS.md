@@ -2,6 +2,12 @@
 
 > **New session?** Start with the "Handoff" entry below the 4b entries, then read CLAUDE.md.
 
+## Oct 22, 2026 — Project moved off OneDrive
+
+- The project now lives at `C:\dev\witchs-cat-cottage`. OneDrive was syncing `node_modules` and flagging every npm install as a mass deletion.
+- The copy was checked: the same branch and commits, a fresh `npm ci`, `npm run check` passing, and the commit hook working from the new path. The Claude Code memory was copied to the new path's project folder.
+- The old copy in `OneDrive\Desktop` is kept until Asa confirms the new one works, then deleted. Don't work in it.
+
 ## Oct 22, 2026 — Tooling: lint, format, CI gate, pre-commit hook
 
 Handoff step 3, as approved by Asa. Four commits: Prettier config and line endings, a formatting-only commit, ESLint wired into check, CI, and this hook.
