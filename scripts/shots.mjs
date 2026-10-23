@@ -66,8 +66,6 @@ const SHOTS = [
   { file: "10-drag-amber.png", seed: BUSY, setup: (p) => p.drag(p.tray("potion"), p.placed("p3")) },
   // Behind the table's right end, its head past the edge: the table hides the rest of the cat.
   { file: "11-cat-behind-table.png", seed: BUSY, setup: (p) => p.pinCat("right", 5.75, 3) },
-  // The mouse resting on the table, no button pressed: its name shows above it.
-  { file: "12-hover-name.png", seed: BUSY, setup: (p) => p.hover(p.placed("p2")) },
 ];
 
 let vite;
@@ -298,13 +296,6 @@ function makePage(cdp) {
         await mouse("mouseMoved", start.x + ((end.x - start.x) * i) / steps, start.y + ((end.y - start.y) * i) / steps);
         await frames(1);
       }
-    },
-    /** Rests the mouse on `target`'s front face without pressing. */
-    async hover(target) {
-      const a = await evaluate(target.query);
-      if (!a) throw new Error(`no ${target.uid} to hover`);
-      await mouse("mouseMoved", a.grabX, a.grabY, false);
-      await frames(2);
     },
     async waitSettled() {
       await waitFor("window.__shots.settled()", "effects to finish");

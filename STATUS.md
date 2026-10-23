@@ -2,6 +2,23 @@
 
 > **New session?** Read the top entries and the "Handoff" entry, then CLAUDE.md. Older entries are in `STATUS-archive.md`; read it only when you need history.
 
+## Oct 23, 2026 — Milestone 4 signed off; hover name removed, swap preview added
+
+**Done**
+- **Milestone 4 signed off by Asa:** the drop preview is liked, the cat behaves as expected, the hover name was removed, and the swap preview was added.
+- Hover name removed (field, handlers, depth constant, shot 12 and the `hover()` helper).
+- For a swap, a second see-through copy of the other item shows at its new spot (`drag.otherPreview`, built only when the partner changes, hidden when the plan isn't a swap, destroyed at drag end).
+- `npm run check` passes (194 tests).
+
+**Not verified**
+- Not run in a real browser; `npm run shots` failed in the coder's sandbox ("Edge didn't start"), so 09-drag-blue is unchecked.
+
+**Re-test**
+- A same-size swap and a different-size swap (e.g. stool onto table) both show two copies.
+
+**Next**
+- A review by both reviewers and a merge, then milestone 5 (starting with the save top-up).
+
 ## Oct 23, 2026 — Milestone-4 sweep fixes
 
 **Done**
