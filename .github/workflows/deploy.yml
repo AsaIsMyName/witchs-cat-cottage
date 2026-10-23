@@ -12,9 +12,10 @@ permissions:
   pages: write
   id-token: write
 
+# A newer feature-branch push cancels an older check; a main deploy always runs to the end.
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   check:

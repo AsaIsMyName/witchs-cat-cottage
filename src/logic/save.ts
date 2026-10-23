@@ -6,7 +6,8 @@
 import type { Placement, RoomState } from "./grid";
 
 // v2: rugs moved to their own layer and the starting tray changed.
-// v3: the ¾ room view: 16 columns, 2 wall rows, and 8 floor rows (was 12, 3, and 3), so older rooms start fresh.
+// v3: the ¾ room view: 16 columns, 2 wall rows, and 9 floor rows (was 12, 3, and 3), so older rooms start fresh.
+// (The floor was 8 rows until the 4a playtest; those v3 saves still fit.)
 export const SAVE_VERSION = 3;
 
 export interface SaveData {

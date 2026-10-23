@@ -8,11 +8,19 @@
 - **Milestone 4b is signed off.** Asa re-tested round 3: diagonal walks are fixed. Asa chose to review and merge 4b now, ahead of 4c (handoff steps 4 and 6 swapped for this batch).
 - **Design-guardian agent** (`.claude/agents/design-guardian.md`, handoff step 4, part A, approved by Asa): a read-only Opus agent (Read, Grep, Glob only). It checks a plan before the coder starts, or a diff afterwards, against CLAUDE.md's intent and for engineering restraint. It reports a verdict (fits, concerns, or conflicts), at most 5 points citing CLAUDE.md, and questions for Asa.
 
+- **Pre-merge review** of `e71641d..ca7ca39` by both reviewers: merge, no blockers. Four low findings, fixed in one commit (Asa's go):
+  - `save.ts`: the v3 comment said 8 floor rows; it's 9 (8-row v3 saves still fit).
+  - `package.json`: the description still described the old "tidy, then please the cat" design.
+  - `npm run typecheck` runs TS 7's `tsc` by path, since `@typescript/old` (TS 6) also installs a `tsc` command and npm could link either on Linux.
+  - CI: a newer push cancels an older run only on the feature branch; a `main` deploy always finishes.
+- Players of the live site get a fresh default room once (v2 saves don't fit the new grid). Expected.
+- **Merged to `main`** and pushed on Asa's go.
+
 **Not verified**
-- The agent registers only after a session restart. Until then it is run as a general agent told to follow its file.
+- The guardian agent now registers by name (the session restarted), but it hasn't been used yet.
+- CI's first run on GitHub was pending when this entry was written. Check the Actions tab.
 
 **Next**
-- Both reviewers on `e71641d..` this commit, then merge to `main` on Asa's go. The merge is the first push of the CI workflow.
 - Handoff step 4, part B: `npm run shots` (approved: headless Edge, its own Vite server, seeded saves, a dev-only hook that pauses the cat and sets its facing, PNGs in a gitignored `shots/`). The guardian checks the coder's plan first.
 - Then 4c.
 
