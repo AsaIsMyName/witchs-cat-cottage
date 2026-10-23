@@ -460,6 +460,9 @@ export class CatActor {
    * point), else at the leg's tile. Hops on and off furniture are short arcs; on top it walks a
    * little slower. Its facing is picked once, from the leg's tile direction (exactly straight or
    * diagonal), and holds for the whole leg; `continuing` legs keep the walk's facing when they can.
+   * A walking leg is timed by its longer axis, so the speed is per axis: a 45° diagonal steps one
+   * whole pixel on x and y together every frame at 60 fps, instead of stepping on most frames and
+   * standing still on about one in three (a stutter). Diagonals are faster along the path for it.
    */
   private walkLeg(leg: Leg, from: Tile, continuing: boolean, exact: Point | undefined, then: () => void): void {
     const host = leg.on !== undefined ? this.getViews().get(leg.on) : undefined;
@@ -472,10 +475,11 @@ export class CatActor {
     const way = tiles.x !== 0 || tiles.y !== 0 ? tiles : { x: target.x - this.cat.x, y: target.y - this.cat.y };
     const deadZone = way === tiles ? 0 : TURN_DEAD_ZONE;
     this.setFacing(legFacing(way.x, way.y, this.facing, continuing, CAT_FACING, deadZone));
-    /** `speed` in tiles per second; none means a hop. */
+    const longerAxis = Math.max(Math.abs(target.x - this.cat.x), Math.abs(target.y - this.cat.y));
+    /** `speed` in tiles per second along the longer axis; none means a hop. */
     const move = (speed: number | undefined, trackDepth: boolean) => {
       if (speed === undefined) return this.startMove(target, CAT_TIMING.hop, then, { arc: HOP_ARC });
-      this.startMove(target, Math.max(150, (distance / (speed * TILE)) * 1000), then, { trackDepth });
+      this.startMove(target, Math.max(150, (longerAxis / (speed * TILE)) * 1000), then, { trackDepth });
     };
 
     if (leg.climb && host && leg.on !== undefined) {
@@ -525,10 +529,11 @@ export class CatActor {
   /**
    * Moves the cat to `to` over `duration`: petting can slow it down, and the speech bubble rides
    * along. `arc` lifts it that many px mid-move, for a hop. With `trackDepth`, its depth follows
-   * its y every frame, so it passes behind front-row items.
+   * its y every frame, so it passes behind front-row items. It starts from a whole pixel (a nudge cut
+   * short can leave it between pixels), and every walk target is one, so x and y step on the same frames.
    */
   private startMove(to: Point, duration: number, then: () => void, opts: { arc?: number; trackDepth?: boolean } = {}): void {
-    const from = { x: this.cat.x, y: this.cat.y };
+    const from = { x: Math.round(this.cat.x), y: Math.round(this.cat.y) };
     const arc = opts.arc ?? 0;
     const progress = { t: 0 };
     const onUpdate = () => {

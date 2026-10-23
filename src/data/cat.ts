@@ -55,6 +55,8 @@ export const OFFENDED_LINE = "mrr.";
 export const CAT_TIMING = {
   // Speeds and the hop arc are in tiles, so they hold at any tile size (the scene multiplies by TILE).
   // The same pace as the old 48px-tile version: 90 and 60 px/s there.
+  // Walk speeds are per axis: a leg is timed by its longer axis, so a 45° diagonal moves 1px on x and
+  // y together each frame at 60 fps (no stutter) and is about 40% faster along its path.
   walkSpeed: 1.875, // tiles per second: a cozy stroll (60 px/s at 32px tiles)
   /** Crossing furniture with a top: slower up there, a short arcing hop on and off. */
   topWalkSpeed: 1.25, // tiles per second (40 px/s)

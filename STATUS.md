@@ -2,6 +2,37 @@
 
 > **New session?** Start with the "Handoff" entry below the 4b entries, then read CLAUDE.md.
 
+## Oct 22, 2026 — 4b fixes, round 3: even steps on diagonal walks (awaiting playtest)
+
+Asa playtested round 2 on a 60 Hz monitor: straight walks look good, diagonals still flickered a little. Loaf/nap facing and the squash are signed off.
+
+**Done**
+- **Cause:** a walking leg was timed by its straight-line length at 60 px/s. On a 45° diagonal each axis then moves about 0.71 px per frame, so the whole-pixel position stepped 1 px on most frames and stood still on about one in three. That uneven cadence was the stutter.
+- **Fix:** walking legs (on the floor and across a furniture top) are timed by their longer axis, so the speed is per axis. A 45° diagonal now steps 1 px on x and y together every frame at 60 fps. Diagonals are about 40% faster along the path (accepted by Asa). Hops, the hop down, and the short nudges are unchanged; the 150 ms minimum stays.
+- `startMove` also starts from a whole pixel, since a bat or sniff nudge cut short can leave the cat between pixels. Every walk target (tile points, seats, the spots beside an item) is already a whole pixel, so no leg ends at a fractional point.
+- **Measured headless** (Edge against the dev server, Phaser capped at 60 fps, temporary hook since removed), four 4-tile diagonals, one per direction:
+  - Before: 128 px in about 182 frames (3.04 s); 53–54 frames stood still, in a 1-1-0 pattern.
+  - After: 128 px in 129–130 frames (2.16 s); every frame steps 1 px on both axes, except a single still frame at one leg seam on two of the walks.
+  - x and y always stepped on the same frames, before and after.
+- Comments in `cat-actor.ts` and the `CAT_TIMING` note in `src/data/cat.ts` say the speeds are per axis.
+- CLAUDE.md's `npm run check` line now lists lint and the format check.
+- **Decisions (Asa, today):**
+  - The commit hook only works on this PC. That's fine: elsewhere it skips without blocking, and CI checks every push.
+  - The short nudges (bat, sniff, groom bob, stare hop) stay sub-pixel unless a shimmer shows up, e.g. after the art pass.
+
+**Not verified**
+- Not run in a real browser. The 60 fps cap was Phaser's own limiter on a faster headless loop, so frame times jittered more than a real 60 Hz monitor's; the steps were still all 1 px.
+- On a monitor faster than 60 Hz (e.g. 144 Hz), steps are 1 px on some frames and 0 on others again, on both axes together, as straight walks always were there.
+- Walking across a furniture top (40 px/s) is under 1 px per frame on any axis, so it still steps unevenly. It's short and wasn't changed.
+
+**Re-test**
+- Long diagonal walks in all four diagonal directions: smooth, no flicker. Check the faster diagonal pace still feels cozy.
+- Straight walks: unchanged.
+
+**Next**
+- Asa re-tests diagonals, then signs off 4b.
+- Then Handoff step 4: the design-guardian agent and `npm run shots`.
+
 ## Oct 22, 2026 — Project moved off OneDrive
 
 - The project now lives at `C:\dev\witchs-cat-cottage`. OneDrive was syncing `node_modules` and flagging every npm install as a mass deletion.

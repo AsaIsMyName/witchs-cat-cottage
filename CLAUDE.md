@@ -229,7 +229,7 @@ These need Asa's decision; the first one blocks the art pass.
 - `npm run dev` — local dev server (add `-- --host` to open it from a phone on the same Wi-Fi)
 - `npm run typecheck` — TypeScript check
 - `npm test` — Vitest unit tests
-- `npm run check` — typecheck + tests; must pass before any commit
+- `npm run check` — typecheck, lint, format check, then tests; must pass before any commit
 - `npm run build` — production build into `dist/`
 
 Layout: `src/scenes/` holds Phaser scenes; `src/logic/` holds Phaser-free game logic and its `*.test.ts` files.
