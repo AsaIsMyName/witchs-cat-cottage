@@ -125,6 +125,8 @@ Written before a session restart so the next session can pick up cleanly. Read t
    Asa approved all three in principle; propose the details first.
 4. **Design-guardian agent and screenshots:**
    - A read-only agent that checks plans and diffs against CLAUDE.md's intent, before the coder starts: decorating first, the cat never judges, earning never a bottleneck, nothing from "Not in v1", cozy and magical tone.
+     - It also gets an **engineering-restraint check** on plans (decided Oct 22, 2026, instead of a separate architect agent): the smallest change that works, it fits the existing modules, and no new abstraction, library, or system without a current need.
+     - Already added: both reviewers flag overbuilding in diffs, and have a **milestone sweep** mode (whole-codebase shape, at most 3 suggestions with "why now"). Run a sweep at each milestone boundary, starting at the end of milestone 4. Revisit a dedicated architect agent around milestone 6.
    - An `npm run shots` script that captures fixed scenes (empty room, busy room, each cat facing, drag highlights) from seeded saves. Check the screenshots after each visual task, before Asa playtests. Headless screenshots worked during 4a.
 5. **4c:** the item name on hover and a drop preview while dragging.
 6. **Review and merge:** both reviewers on everything since `e71641d`, then merge on Asa's go.

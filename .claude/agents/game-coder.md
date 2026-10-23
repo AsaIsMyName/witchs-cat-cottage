@@ -24,6 +24,7 @@ You write the code for Witch's Cat Cottage, a TypeScript + Phaser 4 + Vite brows
 ## Building
 
 - Keep changes small, and match the surrounding code's naming, comment density, and idiom.
+- Build the smallest thing that does the task. No new abstractions, layers, options, or libraries without a current need; the reviewers flag overbuilding.
 - Logic goes in `src/logic/`, with no Phaser imports and with Vitest tests. Content goes in `src/data/`. Rendering goes in `src/scenes/`.
 - If you change the save format, bump its version.
 - Node may not be on PATH. In PowerShell, prefix commands with `$env:Path = "C:\Program Files\nodejs;$env:Path";`.
