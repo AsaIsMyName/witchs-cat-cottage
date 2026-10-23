@@ -43,9 +43,7 @@ export interface SurfacePlacement {
 
 export type Placement = GridPlacement | SurfacePlacement;
 
-export type Target =
-  | { kind: "grid"; col: number; row: number }
-  | { kind: "surface"; hostUid: string; slot: number };
+export type Target = { kind: "grid"; col: number; row: number } | { kind: "surface"; hostUid: string; slot: number };
 
 export interface RoomState {
   placements: Placement[];
@@ -167,13 +165,7 @@ export function placeFromTray(
  * Move a placed item, swapping or replacing as `planDrop` decides. Anything on top of a moved
  * item stays on it. Returns null if it doesn't fit.
  */
-export function moveItem(
-  room: RoomShape,
-  catalog: Catalog,
-  state: RoomState,
-  uid: string,
-  target: Target,
-): RoomState | null {
+export function moveItem(room: RoomShape, catalog: Catalog, state: RoomState, uid: string, target: Target): RoomState | null {
   const current = state.placements.find((p) => p.uid === uid);
   if (!current) return null;
   const plan = planDrop(room, catalog, state, current.itemId, target, uid);
@@ -231,9 +223,7 @@ export function isValidState(room: RoomShape, catalog: Catalog, state: RoomState
 }
 
 export function targetOf(p: Placement): Target {
-  return p.layer === "surface"
-    ? { kind: "surface", hostUid: p.hostUid, slot: p.slot }
-    : { kind: "grid", col: p.col, row: p.row };
+  return p.layer === "surface" ? { kind: "surface", hostUid: p.hostUid, slot: p.slot } : { kind: "grid", col: p.col, row: p.row };
 }
 
 /**
@@ -334,7 +324,9 @@ function swapState(
 type GridSpot = { col: number; row: number };
 
 function overlaps(a: GridSpot, aShape: ItemShape, b: GridSpot, bShape: ItemShape): boolean {
-  return a.col < b.col + bShape.width && b.col < a.col + aShape.width && a.row < b.row + bShape.height && b.row < a.row + aShape.height;
+  return (
+    a.col < b.col + bShape.width && b.col < a.col + aShape.width && a.row < b.row + bShape.height && b.row < a.row + aShape.height
+  );
 }
 
 function toPlacement(uid: string, itemId: string, layer: Layer, target: Target): Placement {

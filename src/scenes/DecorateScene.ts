@@ -109,7 +109,11 @@ export class DecorateScene extends Phaser.Scene {
     });
     this.addResetButton();
     this.renderItems();
-    this.cat = new CatActor(this, () => this.state, () => this.placedViews);
+    this.cat = new CatActor(
+      this,
+      () => this.state,
+      () => this.placedViews,
+    );
   }
 
   /**
@@ -169,7 +173,11 @@ export class DecorateScene extends Phaser.Scene {
     const trayViews = trayItems.map((item) => this.addView(item, { kind: "tray", itemId: item.id }));
     // Left page first, then the right, each row centered on its page.
     const pages = BOOK_PAGES.map(pageItemArea);
-    const xs = layoutTrayRow(trayViews.map((v) => v.trayWidth), pages, TRAY_GAP);
+    const xs = layoutTrayRow(
+      trayViews.map((v) => v.trayWidth),
+      pages,
+      TRAY_GAP,
+    );
     trayViews.forEach((view, i) => {
       const x = xs[i];
       view.setPosition(x, view.footprintYForBottom(TRAY_ITEM_BOTTOM));
@@ -251,9 +259,7 @@ export class DecorateScene extends Phaser.Scene {
       }
       if (next) {
         landedUid =
-          source.kind === "placed"
-            ? source.uid
-            : placementsNotIn(next, this.state).find((p) => p.itemId === source.itemId)?.uid;
+          source.kind === "placed" ? source.uid : placementsNotIn(next, this.state).find((p) => p.itemId === source.itemId)?.uid;
       }
     }
     // A refused drop just re-renders, which snaps the item back to where it came from.

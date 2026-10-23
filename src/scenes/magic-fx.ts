@@ -78,9 +78,7 @@ export function sparkle(scene: Phaser.Scene, x: number, y: number): void {
   const offset = Math.random() * Math.PI * 2;
   for (let i = 0; i < count; i++) {
     const angle = offset + (i / count) * Math.PI * 2;
-    const star = scene.add
-      .star(x, y, 4, size * 0.35, size, colors[i % colors.length])
-      .setDepth(DEPTH_SPARKLE);
+    const star = scene.add.star(x, y, 4, size * 0.35, size, colors[i % colors.length]).setDepth(DEPTH_SPARKLE);
     scene.tweens.add({
       targets: star,
       x: x + Math.cos(angle) * distance,
@@ -112,9 +110,15 @@ export function sendBack(scene: Phaser.Scene, view: ItemView): void {
     scene,
     duration,
     (t) => {
-      ghost.setScale(1 - t).setAngle(360 * turns * t).setAlpha(1 - t * t);
+      ghost
+        .setScale(1 - t)
+        .setAngle(360 * turns * t)
+        .setAlpha(1 - t * t);
       // The swirl grows in as the item shrinks, then fades out at the end.
-      swirl.setScale(0.3 + 0.7 * Math.min(1, t * 2)).setAngle(-360 * t).setAlpha(t < 0.6 ? 1 : (1 - t) / 0.4);
+      swirl
+        .setScale(0.3 + 0.7 * Math.min(1, t * 2))
+        .setAngle(-360 * t)
+        .setAlpha(t < 0.6 ? 1 : (1 - t) / 0.4);
     },
     () => {
       ghost.destroy();

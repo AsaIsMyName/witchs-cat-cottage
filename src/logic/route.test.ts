@@ -109,9 +109,14 @@ describe("findRoute", () => {
 
   it("goes as close as it can to a boxed-in spot", () => {
     const box: [string, number, number][] = [
-      ["cauldron", 9, 0], ["cauldron", 9, 1], ["cauldron", 9, 2],
-      ["cauldron", 10, 0], ["cauldron", 10, 2],
-      ["cauldron", 11, 0], ["cauldron", 11, 1], ["cauldron", 11, 2],
+      ["cauldron", 9, 0],
+      ["cauldron", 9, 1],
+      ["cauldron", 9, 2],
+      ["cauldron", 10, 0],
+      ["cauldron", 10, 2],
+      ["cauldron", 11, 0],
+      ["cauldron", 11, 1],
+      ["cauldron", 11, 2],
     ];
     const route = findRoute(room, catalog, roomWith(...box), { col: 1, row: 1 }, { col: 10, row: 1 }, options);
     expect(route.reached).toEqual({ col: 8, row: 1 });
@@ -172,9 +177,14 @@ describe("findRoute", () => {
   it("never walks through an item to step off onto a free tile two away", () => {
     const ring: [string, number, number][] = [
       ["cauldron", 3, 1],
-      ["cauldron", 2, 0], ["cauldron", 3, 0], ["cauldron", 4, 0],
-      ["cauldron", 2, 1], ["cauldron", 4, 1],
-      ["cauldron", 2, 2], ["cauldron", 3, 2], ["cauldron", 4, 2],
+      ["cauldron", 2, 0],
+      ["cauldron", 3, 0],
+      ["cauldron", 4, 0],
+      ["cauldron", 2, 1],
+      ["cauldron", 4, 1],
+      ["cauldron", 2, 2],
+      ["cauldron", 3, 2],
+      ["cauldron", 4, 2],
     ];
     const route = findRoute(room, catalog, roomWith(...ring), { col: 3, row: 1 }, { col: 0, row: 1 }, options);
     expect(route).toEqual({ legs: [], reached: { col: 3, row: 1 } });
@@ -184,7 +194,14 @@ describe("findRoute", () => {
     // climbCost 2: over the stool is 1 + (1 + 2) + 1 = 4, around through the front row is 4 straight steps.
     // The climb's tile comes first in the scan, so without a tie-break it would win.
     const state = roomWith(["stool", 3, 1], ["cauldron", 3, 0]);
-    const route = findRoute(room, catalog, state, { col: 2, row: 1 }, { col: 4, row: 1 }, { climbCost: 2, frontBackHopCost: 0.5 });
+    const route = findRoute(
+      room,
+      catalog,
+      state,
+      { col: 2, row: 1 },
+      { col: 4, row: 1 },
+      { climbCost: 2, frontBackHopCost: 0.5 },
+    );
     expect(route.legs).toEqual([
       { col: 2, row: 2, climb: false },
       { col: 4, row: 2, climb: false },
@@ -194,7 +211,14 @@ describe("findRoute", () => {
 
   it("climbs at that cost once walking around is longer", () => {
     const state = roomWith(["stool", 3, 1], ["cauldron", 3, 0]);
-    const route = findRoute(room, catalog, state, { col: 2, row: 1 }, { col: 4, row: 1 }, { climbCost: 1.9, frontBackHopCost: 0.5 });
+    const route = findRoute(
+      room,
+      catalog,
+      state,
+      { col: 2, row: 1 },
+      { col: 4, row: 1 },
+      { climbCost: 1.9, frontBackHopCost: 0.5 },
+    );
     expect(route.legs).toEqual([
       { col: 3, row: 1, climb: true, on: "p1" },
       { col: 4, row: 1, climb: false },
@@ -204,11 +228,25 @@ describe("findRoute", () => {
   it("falls back to the nearest reachable floor tile for a boxed-in perch", () => {
     const box: [string, number, number][] = [
       ["table", 9, 1],
-      ["cauldron", 8, 0], ["cauldron", 8, 1], ["cauldron", 8, 2],
-      ["cauldron", 9, 0], ["cauldron", 10, 0], ["cauldron", 9, 2], ["cauldron", 10, 2],
-      ["cauldron", 11, 0], ["cauldron", 11, 1], ["cauldron", 11, 2],
+      ["cauldron", 8, 0],
+      ["cauldron", 8, 1],
+      ["cauldron", 8, 2],
+      ["cauldron", 9, 0],
+      ["cauldron", 10, 0],
+      ["cauldron", 9, 2],
+      ["cauldron", 10, 2],
+      ["cauldron", 11, 0],
+      ["cauldron", 11, 1],
+      ["cauldron", 11, 2],
     ];
-    const route = findRoute(room, catalog, roomWith(...box), { col: 1, row: 1 }, { col: 9, row: 1 }, { ...options, endOnTop: true });
+    const route = findRoute(
+      room,
+      catalog,
+      roomWith(...box),
+      { col: 1, row: 1 },
+      { col: 9, row: 1 },
+      { ...options, endOnTop: true },
+    );
     expect(route.reached).toEqual({ col: 7, row: 1 });
     expect(route.legs.every((leg) => !leg.climb)).toBe(true);
     expect(route.legs.at(-1)).toEqual({ col: 7, row: 1, climb: false });
@@ -332,7 +370,14 @@ describe("planWalk", () => {
 
   it("perched with the goal on that perch, walks across the top to the exact spot", () => {
     const state = roomWith(["table", 5, 1]);
-    const walk = planWalk(room, catalog, state, { col: 6, row: 1 }, { col: 6, row: 1 }, { ...options, onTop: true, endOnTop: true });
+    const walk = planWalk(
+      room,
+      catalog,
+      state,
+      { col: 6, row: 1 },
+      { col: 6, row: 1 },
+      { ...options, onTop: true, endOnTop: true },
+    );
     expect(walk.legs).toEqual([{ col: 6, row: 1, climb: true, on: "p1" }]);
     expect(walk.exact).toBe(true);
   });
@@ -355,8 +400,17 @@ describe("planWalk", () => {
 
   it("off center but walking across the top first, adds nothing", () => {
     const state = roomWith(["table", 3, 1]);
-    const walk = planWalk(room, catalog, state, { col: 3, row: 1 }, { col: 8, row: 1 }, { ...options, onTop: true, offCenter: true });
-    expect(walk.legs).toEqual(findRoute(room, catalog, state, { col: 3, row: 1 }, { col: 8, row: 1 }, { ...options, onTop: true }).legs);
+    const walk = planWalk(
+      room,
+      catalog,
+      state,
+      { col: 3, row: 1 },
+      { col: 8, row: 1 },
+      { ...options, onTop: true, offCenter: true },
+    );
+    expect(walk.legs).toEqual(
+      findRoute(room, catalog, state, { col: 3, row: 1 }, { col: 8, row: 1 }, { ...options, onTop: true }).legs,
+    );
   });
 
   it("ending with a hop up, hops onto the tile and then walks to the exact spot", () => {

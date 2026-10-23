@@ -165,7 +165,10 @@ export class ItemView {
   y = 0;
   private scale = 1;
 
-  constructor(scene: Phaser.Scene, readonly def: ItemDef) {
+  constructor(
+    scene: Phaser.Scene,
+    readonly def: ItemDef,
+  ) {
     this.box = visualBox(def);
     const { w, h, topH } = this.box;
     const hasSprite = scene.textures.exists(def.spriteId);
@@ -356,10 +359,7 @@ function drawSpellbook(scene: Phaser.Scene, g: Phaser.GameObjects.Graphics): voi
  * Creates and positions a view for every placed item. `createView` lets a scene add its own
  * behavior (e.g. dragging). Returns the views by placement uid.
  */
-export function layoutPlacements(
-  state: RoomState,
-  createView: (def: ItemDef, uid: string) => ItemView,
-): Map<string, ItemView> {
+export function layoutPlacements(state: RoomState, createView: (def: ItemDef, uid: string) => ItemView): Map<string, ItemView> {
   const views = new Map<string, ItemView>();
   for (const p of state.placements) {
     if (p.layer === "surface") continue;

@@ -434,7 +434,15 @@ describe("isValidState", () => {
   it("rejects overlaps, unknown items, layer mismatches, and bad uids", () => {
     const table = { itemId: "table", layer: "floor" as const, col: 0, row: 0 };
     const base = { inventory: {}, nextUid: 3 };
-    expect(isValidState(room, catalog, { ...base, placements: [{ uid: "p1", ...table }, { uid: "p2", ...table }] })).toBe(false);
+    expect(
+      isValidState(room, catalog, {
+        ...base,
+        placements: [
+          { uid: "p1", ...table },
+          { uid: "p2", ...table },
+        ],
+      }),
+    ).toBe(false);
     expect(isValidState(room, catalog, { ...base, placements: [{ uid: "p1", ...table, itemId: "ghost" }] })).toBe(false);
     expect(isValidState(room, catalog, { ...base, placements: [{ uid: "p1", ...table, layer: "wall" }] })).toBe(false);
     expect(isValidState(room, catalog, { ...base, placements: [{ uid: "p9", ...table }] })).toBe(false);

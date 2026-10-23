@@ -111,14 +111,7 @@ export function findRoute(
  * - Up on a top but off its tile's center, about to hop off: first to that tile's center, so it hops from the edge.
  * - Ending with a hop onto furniture: hop onto the tile, then walk across the top to the exact spot.
  */
-export function planWalk(
-  room: RoomShape,
-  catalog: Catalog,
-  state: RoomState,
-  from: Tile,
-  to: Tile,
-  options: WalkOptions,
-): Walk {
+export function planWalk(room: RoomShape, catalog: Catalog, state: RoomState, from: Tile, to: Tile, options: WalkOptions): Walk {
   const route = findRoute(room, catalog, state, from, to, options);
   const start = clampTile(room, from);
   const goal = clampTile(room, to);
@@ -219,7 +212,12 @@ function search(room: RoomShape, cells: Cell[][], origin: Tile, climbCost: numbe
  */
 function stepOff(room: RoomShape, cells: Cell[][], start: Tile, goal: Tile): Tile | undefined {
   let best: { tile: Tile; score: number[] } | undefined;
-  for (const [dc, dr] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
+  for (const [dc, dr] of [
+    [0, -1],
+    [-1, 0],
+    [1, 0],
+    [0, 1],
+  ]) {
     const tile = { col: start.col + dc, row: start.row + dr };
     if (!inRoom(room, tile) || cells[tile.row][tile.col].kind !== "free") continue;
     const score = [dr < 0 ? 1 : 0, distance(tile, goal)];

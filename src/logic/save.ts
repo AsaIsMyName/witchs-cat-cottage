@@ -68,9 +68,7 @@ function isPlacement(x: unknown): x is Placement {
   if (!isRecord(x) || typeof x.uid !== "string" || typeof x.itemId !== "string") return false;
   if (x.layer === "surface") return typeof x.hostUid === "string" && typeof x.slot === "number";
   return (
-    (x.layer === "wall" || x.layer === "floor" || x.layer === "rug") &&
-    typeof x.col === "number" &&
-    typeof x.row === "number"
+    (x.layer === "wall" || x.layer === "floor" || x.layer === "rug") && typeof x.col === "number" && typeof x.row === "number"
   );
 }
 

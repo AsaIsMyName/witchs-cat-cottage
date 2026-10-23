@@ -38,8 +38,7 @@ export interface CatBehavior {
 export type IdleAction = "sit" | "groom" | "nap";
 
 export type IdlePlan =
-  | { kind: "visit"; uid: string; reaction: Reaction }
-  | { kind: "wander"; col: number; row: number; action: IdleAction };
+  { kind: "visit"; uid: string; reaction: Reaction } | { kind: "wander"; col: number; row: number; action: IdleAction };
 
 const IDLE_ACTIONS: IdleAction[] = ["sit", "groom", "nap"];
 

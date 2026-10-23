@@ -77,7 +77,13 @@ describe("reactionFor", () => {
     ["chart", grid(9, 0)], // p9
     ["frame", grid(10, 0)], // p10
   ]);
-  const reaction = (uid: string) => reactionFor(catalog, s, s.placements.find((p) => p.uid === uid)!, behavior.rules);
+  const reaction = (uid: string) =>
+    reactionFor(
+      catalog,
+      s,
+      s.placements.find((p) => p.uid === uid)!,
+      behavior.rules,
+    );
 
   it.each([
     ["p1", "nap", "naps on a rug"],

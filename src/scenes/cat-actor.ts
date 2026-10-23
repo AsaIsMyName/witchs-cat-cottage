@@ -139,7 +139,11 @@ export class CatActor {
     const target = this.visiting;
     const visitEnded = target !== undefined && displaced(prev, next, target);
     if (visitEnded) {
-      const reordered = toBack(this.queue, target, next.placements.some((p) => p.uid === target));
+      const reordered = toBack(
+        this.queue,
+        target,
+        next.placements.some((p) => p.uid === target),
+      );
       this.queue.splice(0, this.queue.length, ...reordered);
       this.current = undefined; // already requeued, so interrupt() mustn't put it back at the front
     }
@@ -283,7 +287,8 @@ export class CatActor {
       () => {
         // Views are rebuilt on every room change, so look the item up again: it may have moved or gone mid-walk.
         const now = this.getViews().get(uid);
-        const moved = now !== undefined && Phaser.Math.Distance.BetweenPoints(this.approach(uid, reaction, now).point, point) >= 2;
+        const moved =
+          now !== undefined && Phaser.Math.Distance.BetweenPoints(this.approach(uid, reaction, now).point, point) >= 2;
         if (!now || moved) {
           // A moved item stays queued, so the cat still comes to see it where it is now.
           if (moved && !this.queue.includes(uid)) this.queue.push(uid);
@@ -366,8 +371,12 @@ export class CatActor {
     const side = host && placement?.layer === "surface" ? slotSide(placement.slot, host.def.width) : undefined;
     const x =
       side === "right"
-        ? right < ROOM_X + BEDROOM.columns * TILE - BODY_W ? right : left
-        : left > ROOM_X + BODY_W ? left : right;
+        ? right < ROOM_X + BEDROOM.columns * TILE - BODY_W
+          ? right
+          : left
+        : left > ROOM_X + BODY_W
+          ? left
+          : right;
     return { point: { x, y: footprintBottom(anchor) - FEET_INSET }, perch: false };
   }
 
@@ -454,7 +463,8 @@ export class CatActor {
    */
   private walkLeg(leg: Leg, from: Tile, continuing: boolean, exact: Point | undefined, then: () => void): void {
     const host = leg.on !== undefined ? this.getViews().get(leg.on) : undefined;
-    const target = exact ?? (leg.climb && host ? { x: floorPoint(leg.col, leg.row).x, y: host.seatY } : floorPoint(leg.col, leg.row));
+    const target =
+      exact ?? (leg.climb && host ? { x: floorPoint(leg.col, leg.row).x, y: host.seatY } : floorPoint(leg.col, leg.row));
     const distance = Phaser.Math.Distance.Between(this.cat.x, this.cat.y, target.x, target.y);
     if (distance < 2) return then();
     const tiles = { x: leg.col - from.col, y: leg.row - from.row };
@@ -527,7 +537,10 @@ export class CatActor {
       // Whole pixels: the placeholder is drawn from shapes, which ignore pixelArt's roundPixels, so a
       // sub-pixel position makes its edges and 1.5px outline land on different pixels every frame, and
       // it shimmers (on a diagonal, in both width and height at once).
-      this.cat.setPosition(Math.round(Phaser.Math.Linear(from.x, to.x, t)), Math.round(Phaser.Math.Linear(from.y, to.y, t) - lift));
+      this.cat.setPosition(
+        Math.round(Phaser.Math.Linear(from.x, to.x, t)),
+        Math.round(Phaser.Math.Linear(from.y, to.y, t) - lift),
+      );
       if (opts.trackDepth) this.updateDepth();
       this.followBubble();
     };
@@ -550,10 +563,13 @@ export class CatActor {
     this.tween({ targets: this.cat, scaleY: 1, duration: 250, ease: "Quad.easeOut" });
     if (toward) this.turnTo(toward);
     const blink = CAT_TIMING.offendedBlink;
-    this.tween({ targets: this.face, y: `+=${BLINK_DIP}`, duration: blink / 2, yoyo: true, delay: 300, ease: "Sine.easeInOut" }, () => {
-      this.say(OFFENDED_LINE);
-      this.tween({ targets: this.tail, angle: -30, duration: 110, yoyo: true, ease: "Quad.easeOut" });
-    });
+    this.tween(
+      { targets: this.face, y: `+=${BLINK_DIP}`, duration: blink / 2, yoyo: true, delay: 300, ease: "Sine.easeInOut" },
+      () => {
+        this.say(OFFENDED_LINE);
+        this.tween({ targets: this.tail, angle: -30, duration: 110, yoyo: true, ease: "Quad.easeOut" });
+      },
+    );
     this.later(CAT_TIMING.offendedLength, () => this.finish());
   }
 
