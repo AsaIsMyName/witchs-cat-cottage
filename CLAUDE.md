@@ -6,7 +6,7 @@ Oct 21, 2026 · @kxh
 
 Witch's Cat Cottage is a cozy, magical browser game about decorating a room in a witch's cottage while the witch's cat keeps you company. You summon items out of a magic inventory through little portals, re-theme the room whenever you like, and keep collecting new things to decorate with. **Decorating comes first, above everything else.** There are no wrong answers: the cat reacts to what you place, but never judges or scores it.
 
-- **Platform:** a web game designed for PC: mouse click-and-drag in a desktop browser. Phones stay playable (touch drag works) but aren't tuned. Decided Oct 22, 2026; this frees up screen space and allows smaller tiles and hover.
+- **Platform:** a web game designed for PC: mouse click-and-drag in a desktop browser. Phones stay playable (touch drag works) but aren't tuned.
 - **v1 goal:** find out whether decorating, with the cat around and new items arriving steadily, holds attention for 15 minutes. It is a learning project, not a commercial release.
 - **Tone:** cozy and magical. The default theme is cozy witchy (candles, potions, plants, moons, books). Seasonal, holiday, gothic, and other themes are options the player chooses, not the default.
 
@@ -19,11 +19,7 @@ There's no gate in front of decorating. You decorate the whole time, and the roo
 3. **Earn** along the way: click drifting magic motes, and receive the cat's occasional gifts (optionally, tidy up a messy room too).
 4. **Unlock** new items in the shop, and keep decorating.
 
-Decided Oct 22, 2026: the game moved from "clean, then decorate" to "decorate above all, with magic." Cleaning is now one optional way to earn, not a step before decorating.
-
 ## The cat: a companion, not a judge
-
-Decided Oct 21, 2026, after the milestone 2 playtest: a scored cat review made decorating feel like a puzzle with wrong answers, and didn't make Asa want to rearrange. The cat is now an ambient companion that lives in the room while you decorate.
 
 - **Always there:** the cat is in the Decorate scene the whole time. It never blocks drops or gets in the way of dragging.
 - **No score, no wrong answers:** reactions are always positive, playful, or curious. Nothing is knocked off or sent back to the tray. The one exception: sliding a rug out from under a napping cat gets an offended blink (sits up, one slow unimpressed blink, a quiet "mrr.", a tail flick, then carries on).
@@ -47,7 +43,7 @@ Decided Oct 21, 2026, after the milestone 2 playtest: a scored cat review made d
   - has a top (table, stool): hops up and loafs on it.
   - spooky: ears perk, it stares.
   - anything else: a curious sniff.
-- **Portal moments: dropped for now** (Oct 22, 2026). A version where the cat dove into the spellbook and floated behind its items was built and playtested (milestone 3b). It didn't land: the cat mostly vanished behind an item with only a text bubble, so it never felt like it was playing with them. Don't rebuild it without Asa asking; revisit after the ¾ view and the art pass.
+- **Portal moments: dropped for now.** Don't rebuild the cat's portal dive (milestone 3b) without Asa asking; revisit after the ¾ view and the art pass.
 - **Customizable (milestone 7):** the player names the cat and picks its coat from a set of preset coats, at any time in the game, e.g. to match the room's theme. Presets only in v1; no free color picker. Until a name is chosen, it's "the cat".
 - Its reactions are fixed in v1.
 
@@ -93,7 +89,7 @@ Built in milestone 6 at the earliest, and only if it's still wanted then. It's a
 
 ## Room view: ¾ top-down (milestone 4)
 
-Decided Oct 22, 2026, replacing the front-facing view: the room is seen from above at an angle, like decorating in Stardew Valley. Sizes set in milestone 4a (Oct 22, 2026; a 9th floor row added after its playtest, with the inventory book sized to fit its contents).
+The room is seen from above at an angle, like decorating in Stardew Valley.
 
 - **Deep floor, short wall:** a floor 9 rows deep, seen from above, with the back wall as a 2-row band across the top for wall items. The room is 16 columns wide.
 - **Drawn height is separate from footprint:** an item can be drawn taller than the tiles it takes (e.g. a 2×1 bookshelf drawn three tiles tall), so it overlaps the rows behind it. Each floor item's `standHeight` in `src/data/items.ts` says how many tiles it stands above its footprint: its top face is the footprint lifted by that much, and its front face fills the gap (e.g. table 0.75, stool 0.6, cauldron 1). Rugs are flat, wall items fill their slot (a shelf is a ledge), and surface items have a fixed size.
@@ -152,7 +148,7 @@ TypeScript, Phaser (current stable), and Vite, deployed as a static site so it c
 - **Art is swappable.** Every item, wallpaper, and ground is drawn by sprite id. A missing sprite falls back to a colored rectangle with the item's name, or a flat color for a wallpaper or ground.
 - **Scenes:** Boot, Decorate (with the cat, the magic inventory, and theme switching), Shop; Clean only if optional cleaning is built.
 - **Save:** browser local storage, with a version number in the save format so later changes don't corrupt old saves.
-- **Hosting:** a free static host (GitHub Pages) so each build can be played from anywhere.
+- **Hosting:** a free static host (GitHub Pages) so each build can be played from anywhere. Every push to `main` deploys automatically.
 
 ## Art pipeline
 
@@ -160,7 +156,7 @@ Art is the biggest risk in a decorating game, so it is decoupled from code and d
 
 1. **Rectangles first.** Build and playtest milestones 1–7 with labeled colored rectangles and flat-color wallpapers and grounds.
 2. **Buy the cat sprite pack** (itch.io, roughly $0–15) before generating any props. Its resolution and palette become the game's style.
-   - It should fit the 16px art scale (16×16 tiles, decided in milestone 4a). The purchase itself can wait until the art pass.
+   - It should fit the 16px art scale (16×16 tiles). The purchase itself can wait until the art pass.
    - It must have **4-direction walking** (up, down, left, right) for the ¾ view.
    - It must be recolorable into the preset coats (e.g. a limited palette that can be swapped), or come with several coat colors.
    - If no pack fits, Claude makes the cat as a pixel grid too, in the same style as the props.
@@ -178,12 +174,12 @@ Themes multiply art. Keep v1 to about 3 wallpapers and 3 grounds, and add more o
 
 ## Milestones
 
-Decorating is built first because it is the core of the game; if it isn't fun, the rest doesn't matter. Each milestone ends with a playtest (local server or GitHub Pages, in a desktop browser) and a go/no-go question. Milestones 3–9 were revised on Oct 22, 2026: first for the magic theme, then to add the ¾ view as milestone 4.
+Decorating is built first because it is the core of the game; if it isn't fun, the rest doesn't matter. Each milestone ends with a playtest (local server or GitHub Pages, in a desktop browser) and a go/no-go question.
 
 0. **Setup:** repo, Vite + Phaser + TypeScript, this file as CLAUDE.md, git, first deploy to a static host.
 1. **Decorate sandbox:** one room grid, 10 rectangle items, drag to place, move, and remove, local save. *Test: is arranging things satisfying on its own?*
-2. **Ambient cat:** tags, an always-present cat that wanders, reacts to new items, watches you drag, and can be petted. *Test: does having the cat around make decorating feel cozier and make you want to keep going?* (A first version with a scored review was tried and dropped; see "The cat".)
-3. **Magic layer:** the tray becomes a spellbook inventory, with portal summon and send-back effects, still using rectangles. *Test: does it feel more magical without slowing dragging down?* (Done. The cat's portal dive was tried as 3b and dropped.)
+2. **Ambient cat:** tags, an always-present cat that wanders, reacts to new items, watches you drag, and can be petted. *Test: does having the cat around make decorating feel cozier and make you want to keep going?*
+3. **Magic layer:** the tray becomes a spellbook inventory, with portal summon and send-back effects, still using rectangles. *Test: does it feel more magical without slowing dragging down?*
 4. **¾ room view:** switch to the Stardew-style ¾ top-down view (see "Room view") on a bigger canvas with smaller tiles, for PC, still using rectangles. *Test: does the room feel roomier and nicer to arrange, and does the cat look right walking around and behind things?*
 5. **Room themes:** switchable wallpaper and ground (about 3 of each), and the catalog grows to 25–30 items, with spellbook pages for them. *Test: does re-theming make you want to redecorate?*
 6. **Earning and unlocks:** magic motes, cat gifts, coins, the shop, the cat moments scrapbook, and optional cleaning if still wanted. *Test: do new items arrive steadily enough that you never feel stuck waiting?*
@@ -209,20 +205,12 @@ These rules keep the codebase from drifting as it grows. Claude Code reads this 
 
 ## Open questions
 
-These need Asa's decision; the first one blocks the art pass.
+These need Asa's decision; the first one blocks the art pass. Answered questions, and the history and reasons behind the decisions in this file, are in `DECISIONS.md`: read it before reopening a settled question.
 
 - [ ] Which cat sprite pack? It sets the palette and resolution for everything else, needs 4-direction walking, and must be recolorable into preset coats.
-- [x] Prop size: 16×16 or 32×32 pixels? → **16×16** (decided Oct 22, 2026): tiles are 16 art-pixels, drawn at 2× as 32px screen tiles.
-- [x] Camera view? → **Front-facing room view** (decided Oct 21, 2026), then **replaced by a Stardew-style ¾ top-down view** (decided Oct 22, 2026; milestone 4).
-- [x] Phone or PC? → **PC first**, with phones playable but untuned (decided Oct 22, 2026).
 - [ ] How does the cat deliver gifts, now that the portal dive is dropped? Decide at milestone 6.
-- [x] Does the cat have a name and personality, and should its reactions ever change? → **The player names it and picks a preset coat** (decided Oct 22, 2026); reactions stay fixed in v1.
-- [x] Should there be a gentle goal, such as a "cat moments" journal collecting the reactions you've discovered? → **Yes, a scrapbook built in milestone 6** (decided Oct 22, 2026). Light completionist touch, not tied to coins at first; entry type decided at milestone 6 (see "Earning and unlocks").
-- [x] Without a cat score, what drives coins and unlocks? → **Magic motes and cat gifts, plus optional cleaning, tuned so getting new items is never a bottleneck** (decided Oct 22, 2026). No incremental clicker. Amounts are tuned at milestone 6.
-- [x] One room with themes, or several themed rooms? → **One room with separately switchable wallpaper and ground** (decided Oct 22, 2026).
 - [ ] Are wallpapers and grounds all available from the start, or unlocked in the shop? Decide at milestone 5.
 - [ ] What's the currency called (coins, stardust, …)? Decide at milestone 6.
-- [x] Hosting: GitHub Pages or itch.io? → **GitHub Pages** (decided Oct 21, 2026). Every push to `main` deploys automatically.
 
 ## Project commands
 
