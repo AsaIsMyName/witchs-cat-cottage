@@ -1,6 +1,21 @@
 # Status
 
-## Oct 22, 2026 — Milestone 4a: ¾ room view (awaiting playtest)
+## Oct 22, 2026 — Milestone 4a: ¾ room view (signed off)
+
+Playtest: **signed off** (Oct 22, 2026). Asa's decisions on the open questions:
+- A cauldron in the back floor row hiding the wall slot behind it is fine. Keep it.
+- The left-heavy book (only the potion on the right page) stays as is until milestone 5's paging, when Asa will revisit what feels best.
+- The room should be taller: shrink the book to fit its contents and add a 9th floor row (done below).
+
+**Follow-up: a 9th floor row, and the book sized to its contents**
+- `BEDROOM.floorRows` is 9. Still 16 columns, 2 wall rows, 32px tiles on 960×540.
+- The book is now sized from its contents and sits 4px above the screen's bottom edge. Its page height is the heading space (10), the tallest book item (read from the catalog, today the cauldron at 64), the count space (22), and the page's trim and padding. `TRAY_Y`, and then the room above it, are derived from the book.
+- New numbers:
+  - Room x 224–736. Wall top edge y 34–42, wall band y 42–106, floor (9 rows) y 106–394.
+  - `TRAY_Y` 406. Cover 952×128 at (4, 408). Pages 465×118 at y 413 (left x 10, right x 485). Item areas 443×96 at y 424 (left x 21–464, right x 496–939). Items' bottom is 498 as before (the cauldron tops out at 434, just under the heading at 416), and the ×N counts sit at 504.
+- Saves: a 9-row room accepts every 8-row placement, so `SAVE_VERSION` stays 3 and Asa's layout is kept. A new save test loads a v3 room filled out to the old room's edges (front row 7, wall corners, surface items) and checks it against the real `BEDROOM`.
+- 171 unit tests pass; `npm run build` passes.
+- Re-test: does the taller room feel right, and is the book still comfortable to drag from and back to?
 
 The room is now a Stardew-style ¾ top-down room on a bigger canvas, still with rectangles. Grid rules, swaps, highlights, and the cat's routing logic are unchanged; only the space and the drawing changed.
 

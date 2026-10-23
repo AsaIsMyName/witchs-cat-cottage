@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { RoomState } from "./grid";
+import { CATALOG } from "../data/items";
+import { BEDROOM } from "../data/rooms";
+import { isValidState, type RoomState } from "./grid";
 import { SAVE_VERSION, loadSave, parseSave, writeSave, type KeyValueStore, type SaveData } from "./save";
 
 const bedroom: RoomState = {
@@ -49,6 +51,26 @@ describe("save", () => {
 
   it("rejects saves from another version", () => {
     expect(parseSave(JSON.stringify({ ...save, version: SAVE_VERSION + 1 }), acceptAll)).toBeNull();
+  });
+
+  it("keeps v3 saves from the 8-row room: the 9-row room accepts them as they are", () => {
+    // Filled out to the old room's edges: wall corners, and the front floor row (row 7).
+    const eightRows: RoomState = {
+      placements: [
+        { uid: "p1", itemId: "rug", layer: "rug", col: 14, row: 7 },
+        { uid: "p2", itemId: "table", layer: "floor", col: 14, row: 7 },
+        { uid: "p3", itemId: "candle", layer: "surface", hostUid: "p2", slot: 1 },
+        { uid: "p4", itemId: "cauldron", layer: "floor", col: 0, row: 0 },
+        { uid: "p5", itemId: "shelf", layer: "wall", col: 15, row: 1 },
+        { uid: "p6", itemId: "potion", layer: "surface", hostUid: "p5", slot: 0 },
+        { uid: "p7", itemId: "frame", layer: "wall", col: 0, row: 0 },
+      ],
+      inventory: { candle: 1, potion: 1 },
+      nextUid: 8,
+    };
+    expect(BEDROOM).toMatchObject({ columns: 16, wallRows: 2, floorRows: 9 });
+    const text = JSON.stringify({ version: 3, rooms: { bedroom: eightRows } });
+    expect(parseSave(text, (_, state) => isValidState(BEDROOM, CATALOG, state))?.rooms.bedroom).toEqual(eightRows);
   });
 
   it("is on v3, so v2 saves from the front-facing room start fresh", () => {

@@ -92,9 +92,9 @@ Built in milestone 6 at the earliest, and only if it's still wanted then. It's a
 
 ## Room view: ¾ top-down (milestone 4)
 
-Decided Oct 22, 2026, replacing the front-facing view: the room is seen from above at an angle, like decorating in Stardew Valley. Sizes set in milestone 4a (Oct 22, 2026).
+Decided Oct 22, 2026, replacing the front-facing view: the room is seen from above at an angle, like decorating in Stardew Valley. Sizes set in milestone 4a (Oct 22, 2026; a 9th floor row added after its playtest, with the inventory book sized to fit its contents).
 
-- **Deep floor, short wall:** a floor 8 rows deep, seen from above, with the back wall as a 2-row band across the top for wall items. The room is 16 columns wide.
+- **Deep floor, short wall:** a floor 9 rows deep, seen from above, with the back wall as a 2-row band across the top for wall items. The room is 16 columns wide.
 - **Drawn height is separate from footprint:** an item can be drawn taller than the tiles it takes (e.g. a 2×1 bookshelf drawn three tiles tall), so it overlaps the rows behind it. Each floor item's `standHeight` in `src/data/items.ts` says how many tiles it stands above its footprint: its top face is the footprint lifted by that much, and its front face fills the gap (e.g. table 0.75, stool 0.6, cauldron 1). Rugs are flat, wall items fill their slot (a shelf is a ledge), and surface items have a fixed size.
 - **Draw order by bottom edge:** items and the cat are drawn in order of their bottom edge (a footprint's front edge, the cat's feet), so the cat can walk behind tall furniture and be partly hidden. Rugs always draw under everything on the floor; wall items draw on the wall band, and a tall item in the back row may overlap it.
 - **Bigger canvas, smaller tiles:** a 960×540 game with 32px screen tiles, which are 16px art drawn at 2× (4× on a full-HD screen with the canvas scaled to fit). Not 480×270 with 16px tiles, where placeholder labels and UI text would be unreadable.
@@ -105,7 +105,7 @@ Decided Oct 22, 2026, replacing the front-facing view: the room is seen from abo
 
 Decorating is the core of the game, so it gets built and playtested first (see Milestones).
 
-- **Grid (¾ view, see "Room view"):** the room is 16 columns wide, with 2 rows of wall slots on the wall band above 8 rows of floor (back to front), and things nearer the front draw over things behind them.
+- **Grid (¾ view, see "Room view"):** the room is 16 columns wide, with 2 rows of wall slots on the wall band above 9 rows of floor (back to front), and things nearer the front draw over things behind them.
 - **Footprints:** floor items take 1×1, 2×1, or 2×2 tiles. Wall items are always 1×1, since multi-tile wall art is out of v1.
 - **Layers:** rug (floor coverings), floor (chairs, tables, cauldron), wall (frames, shelves, moon charts), and surface (candles, potions, plants placed on top of furniture or shelves).
 - **Rug rules:** rugs share the floor's rows but sit under furniture. A rug can't overlap another rug, but furniture can stand on it. Moving a rug slides it out alone; furniture on it stays put. A rug that's fully covered can't be grabbed until what's on it is moved.

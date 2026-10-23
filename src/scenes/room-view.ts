@@ -1,7 +1,7 @@
 // Room layout and item drawing for the Decorate scene, in the ¾ top-down view (see CLAUDE.md, "Room view").
 
 import * as Phaser from "phaser";
-import { CATALOG, type ItemDef } from "../data/items";
+import { CATALOG, ITEMS, type ItemDef } from "../data/items";
 import { BEDROOM } from "../data/rooms";
 import type { GridLayer, GridPlacement, RoomState } from "../logic/grid";
 import { standShape } from "../logic/stand";
@@ -11,12 +11,6 @@ export const GAME_HEIGHT = 540;
 
 /** Screen px per tile: 16px art drawn at 2×. */
 export const TILE = 32;
-export const ROOM_X = (GAME_WIDTH - BEDROOM.columns * TILE) / 2;
-/** Top of the wall face (its first row of wall slots). The wall's top edge is drawn just above. */
-export const WALL_Y = 40;
-export const FLOOR_Y = WALL_Y + BEDROOM.wallRows * TILE;
-export const ROOM_BOTTOM = FLOOR_Y + BEDROOM.floorRows * TILE;
-export const TRAY_Y = ROOM_BOTTOM + 12;
 export const SURFACE_ITEM_W = 16;
 export const SURFACE_ITEM_H = 20;
 /** The lighter cap on a surface item's placeholder. */
@@ -30,6 +24,32 @@ const INSET = 2;
 const SEAT_DEPTH = 0.65;
 /** The wall's top edge, seen from above, drawn over the wall face. */
 const WALL_CAP = 8;
+
+// Spellbook geometry. The book is sized to fit its contents and sits at the bottom of the screen;
+// the room fills the space above it. Drawing the book and laying out its items both read these,
+// so they can't drift apart.
+const BOOK_MARGIN = 4;
+const PAGE_TRIM_INSET = 3;
+const PAGE_PADDING = 8;
+/** Room at the top of a page's item area, so the tallest item clears the heading. */
+const TRAY_HEADING_SPACE = 10;
+/** Gap between an item's bottom and its ×N count. */
+export const TRAY_COUNT_GAP = 6;
+/** Room under the items for the count: the gap, one 10px text line, and a little slack. */
+const TRAY_COUNT_SPACE = TRAY_COUNT_GAP + 16;
+/** The tallest item drawn in the book (today the cauldron). */
+const TRAY_TALLEST = Math.max(...ITEMS.map((def) => visualBox(def).h));
+const PAGE_H = TRAY_HEADING_SPACE + TRAY_TALLEST + TRAY_COUNT_SPACE + (PAGE_TRIM_INSET + PAGE_PADDING) * 2;
+const BOOK_COVER: Box = { x: 4, y: GAME_HEIGHT - BOOK_MARGIN - (PAGE_H + 10), w: GAME_WIDTH - 8, h: PAGE_H + 10 };
+/** Top of the inventory: dropping an item below this sends it back. */
+export const TRAY_Y = BOOK_COVER.y - 2;
+
+// The room, above the book.
+export const ROOM_X = (GAME_WIDTH - BEDROOM.columns * TILE) / 2;
+export const ROOM_BOTTOM = TRAY_Y - 12;
+export const FLOOR_Y = ROOM_BOTTOM - BEDROOM.floorRows * TILE;
+/** Top of the wall face (its first row of wall slots). The wall's top edge is drawn just above. */
+export const WALL_Y = FLOOR_Y - BEDROOM.wallRows * TILE;
 
 const DEPTH_WALL = 10;
 const DEPTH_RUG = 50;
@@ -286,11 +306,7 @@ export function drawRoom(scene: Phaser.Scene): void {
   drawSpellbook(scene, g);
 }
 
-// Spellbook geometry. Drawing the book and laying out its items both read these, so they can't drift apart.
-const BOOK_COVER: Box = { x: 4, y: TRAY_Y + 2, w: GAME_WIDTH - 8, h: GAME_HEIGHT - TRAY_Y - 6 };
 const SPINE_X = GAME_WIDTH / 2;
-const PAGE_TRIM_INSET = 3;
-const PAGE_PADDING = 8;
 
 /** The spellbook's two pages, left then right, either side of the spine. */
 export const BOOK_PAGES: Box[] = (() => {
@@ -312,10 +328,6 @@ export function pageItemArea(page: Box): Box {
 
 /** The heading and "reset room" share this text top, above the item row. */
 export const TRAY_HEADING_Y = TRAY_Y + 10;
-/** Gap between an item's bottom and its ×N count. */
-export const TRAY_COUNT_GAP = 6;
-/** Room under the items for the count: the gap, one 10px text line, and a little slack. */
-const TRAY_COUNT_SPACE = TRAY_COUNT_GAP + 16;
 /** Drawn bottom of every item in the book, leaving room for the counts above the page's padded bottom. */
 export const TRAY_ITEM_BOTTOM = (() => {
   const area = pageItemArea(BOOK_PAGES[0]);
